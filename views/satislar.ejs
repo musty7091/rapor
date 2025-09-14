@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapor | <%= sayfaBasligi %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 2rem; background-color: #f4f7f9; }
+        h1 { color: #2c3e50; }
+        a { color: #3498db; text-decoration: none; margin-bottom: 1rem; display: inline-block; font-weight: 500; }
+        a:hover { text-decoration: underline; }
+        
+        /* Filtre Formu Stilleri */
+        .filter-form { background-color: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .form-group { flex-grow: 1; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #34495e; }
+        .form-group select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        button[type="submit"], .reset-button { padding: 0.75rem 1.5rem; border: none; border-radius: 4px; color: #fff; background-color: #3498db; cursor: pointer; font-size: 1rem; font-weight: 500; text-decoration: none; display: inline-block; white-space: nowrap; }
+        .reset-button { background-color: #95a5a6; }
+        button[type="submit"]:hover { background-color: #2980b9; }
+        .reset-button:hover { background-color: #7f8c8d; }
+
+        /* Tablo Stilleri */
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; background-color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+        th, td { border-bottom: 1px solid #ddd; padding: 15px; text-align: left; }
+        th { background-color: #34495e; color: #ffffff; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        tr:hover { background-color: #e9ecef; }
+        td.tutar { text-align: right; font-weight: bold; color: #27ae60; }
+    </style>
+</head>
+<body>
+    <a href="/">&lt; Ana Sayfaya Dön</a>
+    <h1><%= sayfaBasligi %></h1>
+    
+    <!-- Müşteri Filtreleme Formu -->
+    <form action="/satislar" method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="musteri">Müşteriye Göre Filtrele:</label>
+            <select name="musteri" id="musteri">
+                <option value="">Tüm Müşteriler</option>
+                <% if (musteriler) { %>
+                    <% musteriler.forEach(musteri => { %>
+                        <option value="<%= musteri.FIRMAADI %>" <%= (locals.seciliMusteri && seciliMusteri === musteri.FIRMAADI) ? 'selected' : '' %>>
+                            <%= musteri.FIRMAADI %>
+                        </option>
+                    <% }) %>
+                <% } %>
+            </select>
+        </div>
+        <button type="submit">Filtrele</button>
+        <a href="/satislar" class="reset-button">Sıfırla</a>
+    </form>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Müşteri Adı</th>
+                <th>Ürün Adı</th>
+                <th>Miktar</th>
+                <th>Tutar</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (satislar && satislar.length > 0) { %>
+                <% satislar.forEach(satis => { %>
+                    <tr>
+                        <td><%= satis.FIRMAADI %></td>
+                        <td><%= satis.STOK_ADI %></td>
+                        <td><%= satis.MIKTAR %></td>
+                        <td class="tutar"><%= satis.TUTAR.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 20px;">Filtre kriterlerine uygun veri bulunamadı.</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</body>
+</html>
+

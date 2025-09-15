@@ -2,6 +2,7 @@
 <%- include('partials/sidebar') %>
 
 <main class="main-content">
+
     <h1><%= sayfaBasligi %></h1>
     
     <form action="/temsilci-performans" method="GET" class="filter-form">
@@ -35,11 +36,34 @@
                 <% } %>
             </select>
         </div>
+        <div class="form-group">
+            <label for="musteri">Müşteri</label>
+            <select name="musteri" id="musteri">
+                <option value="">Tümü</option>
+                <% if (musteriler) { musteriler.forEach(m => { %>
+                    <option value="<%= m.FIRMAADI %>" <%= (filtreler.musteri === m.FIRMAADI) ? 'selected' : '' %>>
+                        <%= m.FIRMAADI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>>
+                        <%= t.TEDARIKCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
         <button type="submit">Filtrele</button>
         <a href="/temsilci-performans" class="reset-button">Sıfırla</a>
     </form>
 
-    <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+    <h2 style="margin-top: 2rem; font-size: 1.2rem; color: #555;">Filtrelenmiş Sonuçlar</h2>
+    <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
         <div class="kpi-card">
             <div class="icon"><i class="fa-solid fa-coins"></i></div>
             <div class="info">

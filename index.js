@@ -63,7 +63,8 @@ app.get('/', (req, res) => {
     res.render('index', { sayfaBasligi: 'Ana Sayfa', icerik: 'Rapor Uygulamasına Hoş Geldiniz!' });
 });
 
-// === SATIŞ RAPORLARI ===
+// ... (Diğer raporlar aynı kalıyor) ...
+
 app.get('/satislar', async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -104,7 +105,6 @@ app.get('/temsilci-performans', async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
 });
 
-// === KARLILIK RAPORLARI (GÜNCELLENDİ) ===
 app.get('/urun-karlilik', async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -151,7 +151,6 @@ app.get('/urun-karlilik', async (req, res) => {
 });
 
 
-// === KARŞILAŞTIRMALI RAPORLARI ===
 app.get('/temsilci-kiyaslama', async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -205,7 +204,6 @@ app.get('/temsilci-kiyaslama', async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
 });
 
-// === DÖNEM RAPORLARI ===
 app.get('/aylik-trend', async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -223,8 +221,50 @@ app.get('/aylik-trend', async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
 });
 
+// === YENİ FIRSAT RAPORU ===
+app.get('/urun-potansiyeli', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const musteriFiltre = req.query.musteri || '';
+
+        // Filtre için tüm müşterileri çek
+        const musteriler = (await pool.request().query(`
+            SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE} ORDER BY FIRMAADI
+        `)).recordset;
+        
+        let sonuclar = [];
+        if (musteriFiltre) {
+            // 1. Sistemdeki tüm ürünlerin listesini al
+            const allProductsResult = await pool.request().query(`
+                SELECT DISTINCT STOK_ADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE}
+            `);
+            const allProducts = allProductsResult.recordset.map(p => p.STOK_ADI);
+
+            // 2. Seçilen müşterinin satın aldığı ürünlerin listesini al
+            const customerProductsResult = await pool.request()
+                .input('musteriParam', sql.NVarChar, musteriFiltre)
+                .query(`
+                    SELECT DISTINCT STOK_ADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE} AND FIRMAADI = @musteriParam
+                `);
+            const customerProductsSet = new Set(customerProductsResult.recordset.map(p => p.STOK_ADI));
+
+            // 3. İki listeyi birleştirerek nihai sonucu oluştur
+            sonuclar = allProducts.map(productName => ({
+                STOK_ADI: productName,
+                satinAldi: customerProductsSet.has(productName)
+            }));
+        }
+
+        res.render('urun-potansiyeli', {
+            sayfaBasligi: 'Müşteri Ürün Potansiyeli',
+            musteriler,
+            sonuclar,
+            seciliMusteri: musteriFiltre
+        });
+
+    } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
+});
 
 app.listen(PORT, () => {
     console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor...`);
 });
-

@@ -1,0 +1,63 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1><%= sayfaBasligi %></h1>
+
+    <form action="/urun-potansiyeli" method="GET" class="filter-form">
+        <div class="form-group" style="flex-grow: 3;">
+            <label for="musteri">Analiz Edilecek Müşteri</label>
+            <select name="musteri" id="musteri" required>
+                <option value="">Lütfen bir müşteri seçin...</option>
+                <% if (musteriler) { musteriler.forEach(m => { %>
+                    <option value="<%= m.FIRMAADI %>" <%= (seciliMusteri === m.FIRMAADI) ? 'selected' : '' %>>
+                        <%= m.FIRMAADI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <button type="submit">Analiz Et</button>
+        <a href="/urun-potansiyeli" class="reset-button">Sıfırla</a>
+    </form>
+
+    <% if (seciliMusteri) { %>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ürün Adı</th>
+                    <th>Satın Alım Durumu</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (sonuclar && sonuclar.length > 0) { %>
+                    <% sonuclar.forEach(urun => { %>
+                        <tr>
+                            <td><%= urun.STOK_ADI %></td>
+                            <td>
+                                <% if (urun.satinAldi) { %>
+                                    <span class="status-badge status-alindi">
+                                        <i class="fa-solid fa-circle-check"></i> Satın Alındı
+                                    </span>
+                                <% } else { %>
+                                    <span class="status-badge status-potansiyel">
+                                        <i class="fa-solid fa-star"></i> Potansiyel Fırsat
+                                    </span>
+                                <% } %>
+                            </td>
+                        </tr>
+                    <% }) %>
+                <% } else { %>
+                    <tr>
+                        <td colspan="2" style="text-align: center; padding: 20px;">Analiz için veri bulunamadı.</td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen yukarıdaki menüden bir müşteri seçerek analize başlayın.</p>
+        </div>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>

@@ -9,6 +9,8 @@
     --border-color: #e0e0e0;
     --positive-color: #27ae60;
     --negative-color: #c0392b;
+    /* YENİ RENKLER */
+    --warning-color: #f39c12; 
 }
 
 * {
@@ -59,12 +61,19 @@ body {
 }
 
 .sidebar-nav a, .sidebar-nav .menu-title {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 0.8rem 1.5rem;
     text-decoration: none;
     color: var(--secondary-color);
     font-weight: 500;
     transition: background-color 0.2s ease;
+}
+
+.sidebar-nav i {
+    width: 20px;
+    text-align: center;
 }
 
 .sidebar-nav .menu-title {
@@ -222,17 +231,70 @@ td.sayisal {
     color: var(--negative-color);
 }
 
-/* YENİ: Kıyaslama Paneli Stilleri */
-.kpi-card .value.winner {
-    color: var(--positive-color);
+/* KPI Kartları Stilleri */
+.kpi-card {
+    background-color: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.kpi-card .icon {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    opacity: 0.7;
+}
+
+.kpi-card .info h3 {
+    font-size: 1rem;
+    color: #7f8c8d;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+}
+
+.kpi-card .info .value {
+    font-size: 2rem;
     font-weight: bold;
+    color: var(--secondary-color);
+}
+
+.kpi-card .info .value.karlilik {
+    color: var(--positive-color);
+}
+
+.kpi-card .value.winner {
+    color: var(--positive-color) !important;
 }
 
 .kpi-card .value.loser {
-    color: var(--negative-color);
+    color: var(--negative-color) !important;
 }
 
 .comparison-panel.winner-panel {
     box-shadow: 0 4px 15px rgba(39, 174, 96, 0.2);
     border: 1px solid var(--positive-color);
+}
+
+/* YENİ: Durum Etiketleri Stilleri */
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-badge.status-alindi {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: var(--positive-color);
+}
+
+.status-badge.status-potansiyel {
+    background-color: rgba(243, 156, 18, 0.1);
+    color: var(--warning-color);
 }

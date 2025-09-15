@@ -1,0 +1,103 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<style>
+    .result-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+    .result-panel {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        padding: 1.5rem;
+    }
+    .result-panel h2 {
+        margin-bottom: 1rem;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        font-size: 1.2rem;
+    }
+    .result-panel ul {
+        list-style: none;
+        padding: 0;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .result-panel li {
+        padding: 8px 5px;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.9rem;
+    }
+    .result-panel li:last-child {
+        border-bottom: none;
+    }
+</style>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-bullseye"></i> <%= sayfaBasligi %></h1>
+
+    <form action="/musteri-potansiyeli" method="GET" class="filter-form">
+        <div class="form-group" style="flex-grow: 2;">
+            <label for="urun">Analiz Edilecek Ürün</label>
+            <select name="urun" id="urun" required>
+                <option value="">Lütfen bir ürün seçin...</option>
+                <% if (urunler) { urunler.forEach(u => { %>
+                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>>
+                        <%= u.STOK_ADI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>>
+                        <%= t.SATISTEMSILCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <button type="submit">Analiz Et</button>
+        <a href="/musteri-potansiyeli" class="reset-button">Sıfırla</a>
+    </form>
+
+    <% if (filtreler.urun) { %>
+        <div class="result-container">
+            <div class="result-panel">
+                <h2><i class="fa-solid fa-circle-check" style="color: var(--positive-color);"></i> Satın Alan Müşteriler (<%= sonuclar.satinAlan.length %>)</h2>
+                <ul>
+                    <% if (sonuclar.satinAlan.length > 0) { %>
+                        <% sonuclar.satinAlan.sort().forEach(musteri => { %>
+                            <li><%= musteri %></li>
+                        <% }) %>
+                    <% } else { %>
+                        <li>Bu ürünü satın alan müşteri bulunamadı.</li>
+                    <% } %>
+                </ul>
+            </div>
+            <div class="result-panel">
+                <h2><i class="fa-solid fa-star" style="color: var(--warning-color);"></i> Potansiyel Müşteriler (<%= sonuclar.potansiyel.length %>)</h2>
+                <ul>
+                    <% if (sonuclar.potansiyel.length > 0) { %>
+                        <% sonuclar.potansiyel.sort().forEach(musteri => { %>
+                            <li><%= musteri %></li>
+                        <% }) %>
+                    <% } else { %>
+                        <li>Bu ürün için potansiyel müşteri bulunmuyor.</li>
+                    <% } %>
+                </ul>
+            </div>
+        </div>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen yukarıdaki menüden bir ürün seçerek analize başlayın.</p>
+        </div>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>

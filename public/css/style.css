@@ -9,7 +9,6 @@
     --border-color: #e0e0e0;
     --positive-color: #27ae60;
     --negative-color: #c0392b;
-    /* YENİ RENKLER */
     --warning-color: #f39c12; 
 }
 
@@ -108,6 +107,9 @@ body {
 h1 {
     color: var(--secondary-color);
     margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 /* Form ve Filtre Stilleri */
@@ -278,7 +280,7 @@ td.sayisal {
     border: 1px solid var(--positive-color);
 }
 
-/* YENİ: Durum Etiketleri Stilleri */
+/* Durum Etiketleri Stilleri */
 .status-badge {
     padding: 5px 10px;
     border-radius: 15px;

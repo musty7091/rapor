@@ -1,17 +1,85 @@
 <%- include('partials/header') %>
 <%- include('partials/sidebar') %>
 
+<style>
+    .result-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+    .result-panel {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        padding: 1.5rem;
+    }
+    .result-panel h2 {
+        margin-bottom: 1rem;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        font-size: 1.2rem;
+    }
+    .result-panel ul {
+        list-style: none;
+        padding: 0;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .result-panel li {
+        padding: 8px 5px;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.9rem;
+    }
+    .result-panel li:last-child {
+        border-bottom: none;
+    }
+</style>
+
 <main class="main-content">
-    <h1><%= sayfaBasligi %></h1>
+    <h1><i class="fa-solid fa-wand-magic-sparkles"></i> <%= sayfaBasligi %></h1>
 
     <form action="/urun-potansiyeli" method="GET" class="filter-form">
-        <div class="form-group" style="flex-grow: 3;">
+        <div class="form-group" style="flex-grow: 2;">
             <label for="musteri">Analiz Edilecek Müşteri</label>
             <select name="musteri" id="musteri" required>
                 <option value="">Lütfen bir müşteri seçin...</option>
                 <% if (musteriler) { musteriler.forEach(m => { %>
-                    <option value="<%= m.FIRMAADI %>" <%= (seciliMusteri === m.FIRMAADI) ? 'selected' : '' %>>
+                    <option value="<%= m.FIRMAADI %>" <%= (filtreler.musteri === m.FIRMAADI) ? 'selected' : '' %>>
                         <%= m.FIRMAADI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>>
+                        <%= t.SATISTEMSILCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>>
+                        <%= t.TEDARIKCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="kategori">Kategori</label>
+            <select name="kategori" id="kategori">
+                <option value="">Tümü</option>
+                <% if (kategoriler) { kategoriler.forEach(k => { %>
+                    <option value="<%= k.KATEGORI %>" <%= (filtreler.kategori === k.KATEGORI) ? 'selected' : '' %>>
+                        <%= k.KATEGORI %>
                     </option>
                 <% }) } %>
             </select>
@@ -20,39 +88,33 @@
         <a href="/urun-potansiyeli" class="reset-button">Sıfırla</a>
     </form>
 
-    <% if (seciliMusteri) { %>
-        <table>
-            <thead>
-                <tr>
-                    <th>Ürün Adı</th>
-                    <th>Satın Alım Durumu</th>
-                </tr>
-            </thead>
-            <tbody>
-                <% if (sonuclar && sonuclar.length > 0) { %>
-                    <% sonuclar.forEach(urun => { %>
-                        <tr>
-                            <td><%= urun.STOK_ADI %></td>
-                            <td>
-                                <% if (urun.satinAldi) { %>
-                                    <span class="status-badge status-alindi">
-                                        <i class="fa-solid fa-circle-check"></i> Satın Alındı
-                                    </span>
-                                <% } else { %>
-                                    <span class="status-badge status-potansiyel">
-                                        <i class="fa-solid fa-star"></i> Potansiyel Fırsat
-                                    </span>
-                                <% } %>
-                            </td>
-                        </tr>
-                    <% }) %>
-                <% } else { %>
-                    <tr>
-                        <td colspan="2" style="text-align: center; padding: 20px;">Analiz için veri bulunamadı.</td>
-                    </tr>
-                <% } %>
-            </tbody>
-        </table>
+    <% if (filtreler.musteri) { %>
+        <div class="result-container">
+            <div class="result-panel">
+                <h2><i class="fa-solid fa-circle-check" style="color: var(--positive-color);"></i> Satın Alınanlar (<%= sonuclar.satinAlinan.length %>)</h2>
+                <ul>
+                    <% if (sonuclar.satinAlinan.length > 0) { %>
+                        <% sonuclar.satinAlinan.sort().forEach(urun => { %>
+                            <li><%= urun %></li>
+                        <% }) %>
+                    <% } else { %>
+                        <li>Bu filtrelerde satın alınmış ürün yok.</li>
+                    <% } %>
+                </ul>
+            </div>
+            <div class="result-panel">
+                <h2><i class="fa-solid fa-star" style="color: var(--warning-color);"></i> Potansiyel Fırsatlar (<%= sonuclar.potansiyel.length %>)</h2>
+                <ul>
+                    <% if (sonuclar.potansiyel.length > 0) { %>
+                        <% sonuclar.potansiyel.sort().forEach(urun => { %>
+                            <li><%= urun %></li>
+                        <% }) %>
+                    <% } else { %>
+                        <li>Bu filtrelerde potansiyel ürün bulunmuyor.</li>
+                    <% } %>
+                </ul>
+            </div>
+        </div>
     <% } else { %>
         <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
             <p>Lütfen yukarıdaki menüden bir müşteri seçerek analize başlayın.</p>
@@ -61,3 +123,4 @@
 </main>
 
 <%- include('partials/footer') %>
+

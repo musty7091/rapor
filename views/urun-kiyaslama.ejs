@@ -1,0 +1,198 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-chart-simple"></i> <%= sayfaBasligi %></h1>
+
+    <form action="/urun-kiyaslama" method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci" onchange="this.form.submit()">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>>
+                        <%= t.TEDARIKCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci" onchange="this.form.submit()">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>>
+                        <%= t.SATISTEMSILCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group" style="flex-grow: 2;">
+            <label for="urun">Analiz Edilecek Ürün</label>
+            <select name="urun" id="urun" required>
+                <option value="">Lütfen bir ürün seçin...</option>
+                <% if (urunler) { urunler.forEach(u => { %>
+                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>>
+                        <%= u.STOK_ADI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        <button type="submit">Karşılaştır</button>
+        <a href="/urun-kiyaslama" class="reset-button">Sıfırla</a>
+    </form>
+
+    <% if (filtreler.urun && sonuclar.length > 0) { %>
+        <% 
+            const toplam2024 = sonuclar.reduce((sum, s) => sum + s.miktar2024, 0);
+            const toplam2025 = sonuclar.reduce((sum, s) => sum + s.miktar2025, 0);
+            const toplamDegisim = toplam2025 - toplam2024;
+            let yuzdeDegisim = 0;
+            if (toplam2024 > 0) {
+                yuzdeDegisim = ((toplam2025 - toplam2024) / toplam2024) * 100;
+            } else if (toplam2025 > 0) {
+                yuzdeDegisim = 100; // Eğer 0'dan bir sayıya çıkmışsa %100'den fazla artış olarak kabul edilebilir.
+            }
+        %>
+        
+        <!-- YENİ: KPI Kartları -->
+        <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="kpi-card">
+                <div class="icon" style="color: #95a5a6;"><i class="fa-solid fa-calendar-check"></i></div>
+                <div class="info">
+                    <h3>2024 Toplam Satış</h3>
+                    <div class="value"><%= toplam2024.toLocaleString('tr-TR') %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-calendar-check"></i></div>
+                <div class="info">
+                    <h3>2025 Toplam Satış</h3>
+                    <div class="value"><%= toplam2025.toLocaleString('tr-TR') %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                 <div class="icon <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                <div class="info">
+                    <h3>Yıllık Değişim</h3>
+                    <div class="value <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
+                        <% if(toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR') %>
+                    </div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon <%= yuzdeDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><i class="fa-solid fa-percent"></i></div>
+                <div class="info">
+                    <h3>Büyüme Oranı</h3>
+                    <div class="value <%= yuzdeDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
+                        <% if(yuzdeDegisim > 0) { %>+<% } %><%= yuzdeDegisim.toFixed(2) %>%
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="result-container" style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+            <!-- Tablo Paneli -->
+            <div class="result-panel" style="background-color: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 1.5rem;">
+                <h2>Aylık Satış Miktarı Karşılaştırması</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ay</th>
+                            <th>2024 Satış</th>
+                            <th>2025 Satış</th>
+                            <th>Değişim</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% sonuclar.forEach(s => { 
+                            const degisim = s.miktar2025 - s.miktar2024;
+                            let degisimClass = '';
+                            if (degisim > 0) degisimClass = 'karlilik-pozitif';
+                            if (degisim < 0) degisimClass = 'karlilik-negatif';
+                        %>
+                        <tr>
+                            <td><%= s.ay %></td>
+                            <td class="sayisal"><%= s.miktar2024.toLocaleString('tr-TR') %></td>
+                            <td class="sayisal"><%= s.miktar2025.toLocaleString('tr-TR') %></td>
+                            <td class="sayisal <%= degisimClass %>">
+                                <% if (degisim > 0) { %>+<% } %><%= degisim.toLocaleString('tr-TR') %>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                    <!-- YENİ: Toplam Satırı -->
+                    <tfoot>
+                        <tr style="background-color: var(--secondary-color); color: #fff; font-weight: bold;">
+                            <td>TOPLAM</td>
+                            <td class="sayisal"><%= toplam2024.toLocaleString('tr-TR') %></td>
+                            <td class="sayisal"><%= toplam2025.toLocaleString('tr-TR') %></td>
+                            <td class="sayisal">
+                                 <% if (toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR') %>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Grafik Paneli -->
+            <div class="chart-container" style="background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                 <h2>Grafiksel Karşılaştırma</h2>
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </div>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen yukarıdaki menülerden filtreleme yaparak bir ürün seçin ve karşılaştırmaya başlayın.</p>
+        </div>
+    <% } %>
+</main>
+
+<% if (filtreler.urun) { %>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('comparisonChart').getContext('2d');
+        const sonuclar = <%- JSON.stringify(sonuclar) %>;
+
+        const labels = sonuclar.map(d => d.ay);
+        const data2024 = sonuclar.map(d => d.miktar2024);
+        const data2025 = sonuclar.map(d => d.miktar2025);
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '2024 Satış Miktarı',
+                        data: data2024,
+                        backgroundColor: 'rgba(149, 165, 166, 0.8)', // Gri
+                        borderColor: 'rgba(127, 140, 141, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: '2025 Satış Miktarı',
+                        data: data2025,
+                        backgroundColor: 'rgba(52, 152, 219, 0.8)', // Mavi
+                        borderColor: 'rgba(41, 128, 185, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    title: { display: true, text: '<%= filtreler.urun %> - Yıllık Satış Karşılaştırması' }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    });
+</script>
+<% } %>
+
+<%- include('partials/footer') %>

@@ -48,6 +48,16 @@
                 <% }) } %>
             </select>
         </div>
+        <%# YENİ EKLENEN FİLTRE %>
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>><%= t.TEDARIKCI %></option>
+                <% }) } %>
+            </select>
+        </div>
         <div class="form-actions">
             <button type="submit">Analiz Et</button>
             <a href="/musteri-deger-analizi" class="reset-button">Sıfırla</a>
@@ -80,6 +90,7 @@
                     <th>Sınıf</th>
                     <th>Müşteri Adı</th>
                     <th>Toplam Ciro</th>
+                    <th>Ciro Payı %</th> <%# YENİ EKLENEN SÜTUN %>
                     <th>Toplam Kâr</th>
                     <th>Kümülatif Ciro %</th>
                 </tr>
@@ -90,6 +101,8 @@
                         <td><span class="class-badge class-<%= s.Sinif %>"><%= s.Sinif %></span></td>
                         <td><%= s.FIRMAADI %></td>
                         <td class="sayisal"><%= s.ToplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                        <%# YENİ EKLENEN SÜTUN VERİSİ %>
+                        <td class="sayisal"><%= s.CiroPayiYuzdesi.toFixed(2) %>%</td>
                         <td class="sayisal"><%= s.ToplamKar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
                         <td class="sayisal karlilik-pozitif"><%= s.KumulatifCiroYuzdesi.toFixed(2) %>%</td>
                     </tr>

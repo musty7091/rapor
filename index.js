@@ -547,12 +547,12 @@ app.get('/musteri-kayip-urun', async (req, res) => {
 });
 
 // =================================================================
-// GÜNCELLENEN RAPOR: MÜŞTERİ DEĞER ANALİZİ (ABC) - SQL SYNTAX DÜZELTMESİ
+// GÜNCELLENEN RAPOR: MÜŞTERİ DEĞER ANALİZİ (YENİ FİLTRE VE SÜTUN İLE)
 // =================================================================
 app.get('/musteri-deger-analizi', async (req, res) => {
     try {
         const pool = await poolPromise;
-        let { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
+        let { temsilci, tedarikci, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
 
         if (zamanAraligi && zamanAraligi !== 'manuel') {
             const range = getDateRange(zamanAraligi);
@@ -562,20 +562,20 @@ app.get('/musteri-deger-analizi', async (req, res) => {
             }
         }
         
-        const { temsilciler } = await getFilterData(['temsilciler']);
+        const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
 
         let sonuclar = [];
         let kpis = { toplamCiro: 0, sayiA: 0, sayiB: 0, sayiC: 0 };
         
-        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`; // Yıl filtresini dinamik yapacağız
+        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
         const request = pool.request();
         if (temsilci) { whereClauses += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (tedarikci) { whereClauses += ` AND TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
         if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
         if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
 
-        // DÜZELTİLMİŞ SQL SORGUSU
         const abcQuery = `
-            ${KARLILIK_HESAPLAMA_CTE}, -- Hatalı olan ';WITH' ifadesi ',' ile değiştirildi.
+            ${KARLILIK_HESAPLAMA_CTE},
             MusteriCiroKar AS (
                 SELECT
                     FIRMAADI,
@@ -593,6 +593,7 @@ app.get('/musteri-deger-analizi', async (req, res) => {
                     FIRMAADI,
                     ToplamCiro,
                     ToplamKar,
+                    (ToplamCiro * 100.0) / GenelToplamCiro AS CiroPayiYuzdesi,
                     (SUM(ToplamCiro) OVER (ORDER BY ToplamCiro DESC, FIRMAADI) * 100.0) / GenelToplamCiro AS KumulatifCiroYuzdesi
                 FROM MusteriCiroKar, GenelToplam
             )
@@ -600,6 +601,7 @@ app.get('/musteri-deger-analizi', async (req, res) => {
                 FIRMAADI,
                 ToplamCiro,
                 ToplamKar,
+                CiroPayiYuzdesi,
                 KumulatifCiroYuzdesi,
                 CASE
                     WHEN KumulatifCiroYuzdesi <= 80 THEN 'A'
@@ -627,7 +629,8 @@ app.get('/musteri-deger-analizi', async (req, res) => {
             sonuclar,
             kpis,
             temsilciler,
-            filtreler: { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi }
+            tedarikciler,
+            filtreler: { temsilci, tedarikci, baslangicTarihi, bitisTarihi, zamanAraligi }
         });
 
     } catch (err) {

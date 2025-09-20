@@ -10,10 +10,9 @@
 </style>
 
 <main class="main-content">
-    <h1><%= sayfaBasligi %></h1>
+    <h1><i class="fa-solid fa-scale-balanced"></i> <%= sayfaBasligi %></h1>
 
     <form action="/temsilci-kiyaslama" method="GET" class="filter-form">
-        <!-- Temsilci Seçimleri -->
         <div class="form-group">
             <label for="temsilci1">1. Temsilci</label>
             <select name="temsilci1" id="temsilci1">
@@ -33,7 +32,6 @@
             </select>
         </div>
         
-        <!-- Pratik Tarih Seçimi -->
         <div class="form-group">
             <label for="zamanAraligi">Pratik Tarih Aralığı</label>
             <select name="zamanAraligi" id="zamanAraligi">
@@ -44,7 +42,6 @@
             </select>
         </div>
 
-        <!-- Manuel Tarih Seçimleri -->
         <div class="form-group">
             <label for="baslangicTarihi">Başlangıç Tarihi</label>
             <input type="date" id="baslangicTarihi" name="baslangicTarihi" value="<%= filtreler.baslangicTarihi || '' %>">
@@ -54,7 +51,6 @@
             <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
         </div>
 
-        <!-- Diğer Filtreler -->
         <div class="form-group">
             <label for="kategori">Kategori</label>
             <select name="kategori" id="kategori">
@@ -74,11 +70,12 @@
             </select>
         </div>
         
-        <button type="submit">Kıyasla</button>
-        <a href="/temsilci-kiyaslama" class="reset-button">Sıfırla</a>
+        <div class="form-actions">
+            <button type="submit">Kıyasla</button>
+            <a href="/temsilci-kiyaslama" class="reset-button">Sıfırla</a>
+        </div>
     </form>
 
-    <!-- Kıyaslama Sonuç Paneli -->
     <% 
         const metrics = ['ToplamCiro', 'ToplamKar', 'ToplamMiktar', 'ToplamLitre', 'MusteriSayisi'];
         const classes = { sonuc1: {}, sonuc2: {} };
@@ -125,7 +122,6 @@
     </div>
 </main>
 
-<!-- YENİ ve DÜZELTİLMİŞ Javascript Kodu -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const zamanAraligiSelect = document.getElementById('zamanAraligi');
@@ -134,7 +130,6 @@
 
         function handleDateInputsState() {
             const period = zamanAraligiSelect.value;
-            // Pratik bir aralık seçildiyse manuel tarih kutularını kilitle
             if (period !== 'manuel') {
                 baslangicInput.disabled = true;
                 bitisInput.disabled = true;
@@ -144,20 +139,14 @@
             }
         }
 
-        // Kullanıcı pratik aralığı değiştirdiğinde...
         zamanAraligiSelect.addEventListener('change', function() {
             const period = this.value;
-            // Eğer pratik bir aralık seçtiyse, manuel tarihleri TEMİZLE.
-            // Bu, form gönderildiğinde sadece 'zamanAraligi'nın gitmesini sağlar.
             if (period !== 'manuel') {
                 baslangicInput.value = '';
                 bitisInput.value = '';
             }
-            // Arayüzü güncelle
             handleDateInputsState();
         });
-        
-        // Sayfa ilk yüklendiğinde de arayüzün durumunu doğru ayarla
         handleDateInputsState();
     });
 </script>

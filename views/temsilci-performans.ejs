@@ -3,7 +3,7 @@
 
 <main class="main-content">
 
-    <h1><%= sayfaBasligi %></h1>
+    <h1><i class="fa-solid fa-chart-line"></i> <%= sayfaBasligi %></h1>
     
     <form action="/temsilci-performans" method="GET" class="filter-form">
         <div class="form-group">
@@ -36,6 +36,7 @@
                 <% } %>
             </select>
         </div>
+        
         <div class="form-group">
             <label for="musteri">Müşteri</label>
             <select name="musteri" id="musteri">
@@ -58,42 +59,104 @@
                 <% }) } %>
             </select>
         </div>
-        <button type="submit">Filtrele</button>
-        <a href="/temsilci-performans" class="reset-button">Sıfırla</a>
+
+        <div class="form-actions">
+            <button type="submit">Filtrele</button>
+            <a href="/temsilci-performans" class="reset-button">Sıfırla</a>
+        </div>
     </form>
 
-    <h2 style="margin-top: 2rem; font-size: 1.2rem; color: #555;">Filtrelenmiş Sonuçlar</h2>
-    <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
-        <div class="kpi-card">
-            <div class="icon"><i class="fa-solid fa-coins"></i></div>
-            <div class="info">
-                <h3>Toplam Ciro</h3>
-                <div class="value"><%= sonuc.ToplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+    <% if (filtreler.yil || filtreler.ay || filtreler.temsilci || filtreler.musteri || filtreler.tedarikci) { %>
+        <h2 style="margin-top: 2rem; font-size: 1.2rem; color: #555;">Filtrelenmiş Sonuçlar</h2>
+        <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-coins"></i></div>
+                <div class="info">
+                    <h3>Toplam Ciro</h3>
+                    <div class="value"><%= sonuc.ToplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-piggy-bank"></i></div>
+                <div class="info">
+                    <h3>Toplam Brüt Kâr</h3>
+                    <div class="value"><%= sonuc.ToplamKar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-percent"></i></div>
+                <div class="info">
+                    <h3>Kârlılık Oranı</h3>
+                    <% const karlilik = sonuc.ToplamCiro > 0 ? (sonuc.ToplamKar / sonuc.ToplamCiro) * 100 : 0; %>
+                    <div class="value karlilik"><%= karlilik.toFixed(2) %>%</div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-users"></i></div>
+                <div class="info">
+                    <h3>Ulaşılan Müşteri Sayısı</h3>
+                    <div class="value"><%= sonuc.MusteriSayisi %></div>
+                </div>
             </div>
         </div>
-        <div class="kpi-card">
-            <div class="icon"><i class="fa-solid fa-piggy-bank"></i></div>
-            <div class="info">
-                <h3>Toplam Brüt Kâr</h3>
-                <div class="value"><%= sonuc.ToplamKar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
-            </div>
-        </div>
-        <div class="kpi-card">
-            <div class="icon"><i class="fa-solid fa-percent"></i></div>
-            <div class="info">
-                <h3>Kârlılık Oranı</h3>
-                <% const karlilik = sonuc.ToplamCiro > 0 ? (sonuc.ToplamKar / sonuc.ToplamCiro) * 100 : 0; %>
-                <div class="value karlilik"><%= karlilik.toFixed(2) %>%</div>
-            </div>
-        </div>
-        <div class="kpi-card">
-            <div class="icon"><i class="fa-solid fa-users"></i></div>
-            <div class="info">
-                <h3>Ulaşılan Müşteri Sayısı</h3>
-                <div class="value"><%= sonuc.MusteriSayisi %></div>
-            </div>
-        </div>
-    </div>
-</main>
+    <% } %> </main>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const yilSelect = document.getElementById('yil');
+        const aySelect = document.getElementById('ay');
+        const temsilciSelect = document.getElementById('temsilci');
+        const musteriSelect = document.getElementById('musteri');
+
+        async function guncelleMusteriler() {
+            const yil = yilSelect.value;
+            const ay = aySelect.value;
+            const temsilci = temsilciSelect.value;
+            
+            // Bu satırı değiştiriyoruz. Artık URL'den değil, o anki seçili değerden alacağız.
+            const seciliMusteri = musteriSelect.value;
+
+            musteriSelect.disabled = true;
+            musteriSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+            
+            try {
+                const response = await fetch(`/api/musteriler?yil=${yil}&ay=${ay}&temsilci=${encodeURIComponent(temsilci)}`);
+                if (!response.ok) {
+                    throw new Error('Sunucu hatası');
+                }
+                const musteriler = await response.json();
+                
+                musteriSelect.innerHTML = '<option value="">Tümü</option>';
+                
+                let seciliMusteriHalaListede = false;
+                musteriler.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m.FIRMAADI;
+                    option.textContent = m.FIRMAADI;
+                    if (m.FIRMAADI === seciliMusteri) {
+                        option.selected = true;
+                        seciliMusteriHalaListede = true;
+                    }
+                    musteriSelect.appendChild(option);
+                });
+                
+                // Eğer önceden seçili müşteri yeni daraltılmış listede yoksa, "Tümü" seçeneğine geri dön.
+                if (!seciliMusteriHalaListede) {
+                    musteriSelect.value = "";
+                }
+
+            } catch (error) {
+                console.error('Müşteriler güncellenirken hata oluştu:', error);
+                musteriSelect.innerHTML = '<option value="">Müşteriler yüklenemedi!</option>';
+            } finally {
+                musteriSelect.disabled = false;
+            }
+        }
+
+        yilSelect.addEventListener('change', guncelleMusteriler);
+        aySelect.addEventListener('change', guncelleMusteriler);
+        temsilciSelect.addEventListener('change', guncelleMusteriler);
+    });
+</script>
 
 <%- include('partials/footer') %>

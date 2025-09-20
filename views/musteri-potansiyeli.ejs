@@ -2,38 +2,12 @@
 <%- include('partials/sidebar') %>
 
 <style>
-    .result-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-        gap: 2rem;
-        margin-top: 2rem;
-    }
-    .result-panel {
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        padding: 1.5rem;
-    }
-    .result-panel h2 {
-        margin-bottom: 1rem;
-        border-bottom: 2px solid var(--border-color);
-        padding-bottom: 0.5rem;
-        font-size: 1.2rem;
-    }
-    .result-panel ul {
-        list-style: none;
-        padding: 0;
-        max-height: 400px;
-        overflow-y: auto;
-    }
-    .result-panel li {
-        padding: 8px 5px;
-        border-bottom: 1px solid #f0f0f0;
-        font-size: 0.9rem;
-    }
-    .result-panel li:last-child {
-        border-bottom: none;
-    }
+    .result-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-top: 2rem; }
+    .result-panel { background-color: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 1.5rem; }
+    .result-panel h2 { margin-bottom: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; font-size: 1.2rem; }
+    .result-panel ul { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; }
+    .result-panel li { padding: 8px 5px; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
+    .result-panel li:last-child { border-bottom: none; }
 </style>
 
 <main class="main-content">
@@ -62,8 +36,11 @@
                 <% }) } %>
             </select>
         </div>
-        <button type="submit">Analiz Et</button>
-        <a href="/musteri-potansiyeli" class="reset-button">Sıfırla</a>
+
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+            <a href="/musteri-potansiyeli" class="reset-button">Sıfırla</a>
+        </div>
     </form>
 
     <% if (filtreler.urun) { %>

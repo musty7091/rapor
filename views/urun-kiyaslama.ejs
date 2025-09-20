@@ -38,8 +38,11 @@
                 <% }) } %>
             </select>
         </div>
-        <button type="submit">Karşılaştır</button>
-        <a href="/urun-kiyaslama" class="reset-button">Sıfırla</a>
+        
+        <div class="form-actions">
+            <button type="submit">Karşılaştır</button>
+            <a href="/urun-kiyaslama" class="reset-button">Sıfırla</a>
+        </div>
     </form>
 
     <% if (filtreler.urun && sonuclar.length > 0) { %>
@@ -71,7 +74,7 @@
                 </div>
             </div>
             <div class="kpi-card">
-                 <div class="icon <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                <div class="icon <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><i class="fa-solid fa-arrow-trend-up"></i></div>
                 <div class="info">
                     <h3>Yıllık Değişim</h3>
                     <div class="value <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
@@ -89,7 +92,7 @@
                 </div>
             </div>
         </div>
-
+        
         <div class="result-container" style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
             <div class="result-panel" style="background-color: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 1.5rem;">
                 <h2>Aylık Satış Miktarı Karşılaştırması</h2>
@@ -195,33 +198,25 @@
         const tedarikciSelect = document.getElementById('tedarikci');
         const temsilciSelect = document.getElementById('temsilci');
         const urunSelect = document.getElementById('urun');
-        // Sayfa ilk yüklendiğinde seçili olan ürünü sakla
         const seciliUrun = urunSelect.value;
 
         async function guncelleUrunler() {
             const tedarikci = tedarikciSelect.value;
             const temsilci = temsilciSelect.value;
             
-            // Yükleniyor... durumunu belirtmek için dropdown'ı kilitle (opsiyonel)
             urunSelect.disabled = true;
             
             try {
-                // Yeni API rotasına istek at
                 const response = await fetch(`/api/urunler?tedarikci=${encodeURIComponent(tedarikci)}&temsilci=${encodeURIComponent(temsilci)}`);
                 if (!response.ok) {
                     throw new Error('Sunucu hatası');
                 }
                 const urunler = await response.json();
-                
-                // Ürün dropdown'ını temizle
                 urunSelect.innerHTML = '<option value="">Lütfen bir ürün seçin...</option>';
-                
-                // Yeni ürünleri ekle
                 urunler.forEach(u => {
                     const option = document.createElement('option');
                     option.value = u.STOK_ADI;
                     option.textContent = u.STOK_ADI;
-                    // Eğer bu ürün, sayfa ilk yüklendiğindeki ürün ise, tekrar seçili yap
                     if (u.STOK_ADI === seciliUrun) {
                         option.selected = true;
                     }
@@ -229,19 +224,15 @@
                 });
             } catch (error) {
                 console.error('Ürünler güncellenirken hata oluştu:', error);
-                // Hata durumunda kullanıcıya bilgi verilebilir
                 urunSelect.innerHTML = '<option value="">Ürünler yüklenemedi!</option>';
             } finally {
-                // İşlem bitince dropdown'ı tekrar aktif et
                 urunSelect.disabled = false;
             }
         }
 
-        // Filtreler değiştiğinde ürün listesini güncelle
         tedarikciSelect.addEventListener('change', guncelleUrunler);
         temsilciSelect.addEventListener('change', guncelleUrunler);
     });
 </script>
-
 
 <%- include('partials/footer') %>

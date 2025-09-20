@@ -3,7 +3,7 @@
 
 <main class="main-content">
 
-    <h1><%= sayfaBasligi %></h1>
+    <h1><i class="fa-solid fa-sack-dollar"></i> <%= sayfaBasligi %></h1>
 
     <form action="/urun-karlilik" method="GET" class="filter-form">
         <div class="form-group">
@@ -23,6 +23,17 @@
             <label for="bitisTarihi">Bitiş Tarihi</label>
             <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
         </div>
+        
+        <div class="form-group">
+            <label for="urun">Ürün</label>
+            <select name="urun" id="urun">
+                <option value="">Tümü</option>
+                <% if (urunler) { urunler.forEach(u => { %>
+                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>><%= u.STOK_ADI %></option>
+                <% }) } %>
+            </select>
+        </div>
+
         <div class="form-group">
             <label for="kategori">Kategori</label>
             <select name="kategori" id="kategori">
@@ -50,9 +61,45 @@
                 <% }) } %>
             </select>
         </div>
-        <button type="submit">Filtrele</button>
-        <a href="/urun-karlilik" class="reset-button">Sıfırla</a>
+        
+        <div class="form-actions">
+            <button type="submit">Filtrele</button>
+            <a href="/urun-karlilik" class="reset-button">Sıfırla</a>
+        </div>
     </form>
+
+    <% if (sonuclar && sonuclar.length > 0) { %>
+        <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-coins"></i></div>
+                <div class="info">
+                    <h3>Toplam Ciro</h3>
+                    <div class="value"><%= kpis.toplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-piggy-bank"></i></div>
+                <div class="info">
+                    <h3>Toplam Brüt Kâr</h3>
+                    <div class="value"><%= kpis.toplamKar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-percent"></i></div>
+                <div class="info">
+                    <h3>Ortalama Kârlılık</h3>
+                    <div class="value <%= kpis.ortalamaKarlilik >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><%= kpis.ortalamaKarlilik.toFixed(2) %>%</div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-box-open"></i></div>
+                <div class="info">
+                    <h3>Listelenen Ürün</h3>
+                    <div class="value"><%= kpis.urunSayisi %></div>
+                </div>
+            </div>
+        </div>
+    <% } %>
 
     <table>
         <thead>

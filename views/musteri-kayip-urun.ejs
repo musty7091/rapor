@@ -1,0 +1,157 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<style>
+    .result-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-top: 2rem; }
+    .result-panel { background-color: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 1.5rem; }
+    .result-panel h2 { margin-bottom: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem;}
+    .result-panel ul { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; }
+    .result-panel li { padding: 8px 5px; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
+    .result-panel li:last-child { border-bottom: none; }
+</style>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-user-tag"></i> <%= sayfaBasligi %></h1>
+
+    <form action="/musteri-kayip-urun" method="GET" class="filter-form">
+        
+        <%# FİLTRE SIRASI GÜNCELLENDİ %>
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>>
+                        <%= t.SATISTEMSILCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>>
+                        <%= t.TEDARIKCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+
+        <div class="form-group" style="flex-grow: 2;">
+            <label for="musteri">Analiz Edilecek Müşteri</label>
+            <select name="musteri" id="musteri" required>
+                <option value="">Lütfen bir müşteri seçin...</option>
+                <% if (musteriler) { musteriler.forEach(m => { %>
+                    <option value="<%= m.FIRMAADI %>" <%= (filtreler.musteri === m.FIRMAADI) ? 'selected' : '' %>>
+                        <%= m.FIRMAADI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+        
+        <div class="form-actions">
+             <button type="submit">Analiz Et</button>
+            <a href="/musteri-kayip-urun" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+
+    <% if (filtreler.musteri) { %>
+        <div class="result-container">
+            <div class="result-panel">
+                <h2><i class="fa-solid fa-arrow-down-long" style="color: var(--negative-color);"></i> 2024'te Alıp 2025'te Almadığı (Kayıp) Ürünler (<%= sonuclar.kayipUrunler.length %>)</h2>
+                <ul>
+                    <% if (sonuclar.kayipUrunler.length > 0) { %>
+                        <% sonuclar.kayipUrunler.sort((a, b) => a.STOK_ADI.localeCompare(b.STOK_ADI)).forEach(urun => { %>
+                            <li><%= urun.STOK_ADI %></li>
+                        <% }) %>
+                    <% } else { %>
+                        <li>Bu müşteri için seçilen filtrelerde 2024'ten 2025'e kaybedilen bir ürün bulunamadı.</li>
+                    <% } %>
+                </ul>
+            </div>
+            <div class="result-panel">
+                <h2><i class="fa-solid fa-arrow-up-long" style="color: var(--positive-color);"></i> 2025'te Yeni Aldığı Ürünler (<%= sonuclar.yeniUrunler.length %>)</h2>
+                <ul>
+                    <% if (sonuclar.yeniUrunler.length > 0) { %>
+                        <% sonuclar.yeniUrunler.sort((a, b) => a.STOK_ADI.localeCompare(b.STOK_ADI)).forEach(urun => { %>
+                            <li><%= urun.STOK_ADI %></li>
+                        <% }) %>
+                    <% } else { %>
+                        <li>Bu müşteri 2025 yılında seçilen filtrelerde yeni bir ürün almamış.</li>
+                    <% } %>
+                </ul>
+            </div>
+        </div>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen yukarıdaki menüden bir müşteri seçerek analize başlayın.</p>
+        </div>
+    <% } %>
+</main>
+
+<%# YENİ EKLENEN JAVASCRIPT KODU: Temsilciye göre müşteri listesini günceller %>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const temsilciSelect = document.getElementById('temsilci');
+        const musteriSelect = document.getElementById('musteri');
+        
+        // Sayfa yüklendiğinde seçili olan müşteriyi hafızada tut
+        const baslangictaSeciliMusteri = musteriSelect.value;
+
+        async function musteriListesiniGuncelle() {
+            const seciliTemsilci = temsilciSelect.value;
+            
+            // Müşteri listesini güncellemeden önce o anki seçili değeri alalım
+            const oAnSeciliMusteri = musteriSelect.value;
+
+            musteriSelect.disabled = true;
+            musteriSelect.innerHTML = '<option value="">Müşteriler Yükleniyor...</option>';
+
+            try {
+                // Temsilciye göre müşterileri getiren yeni API'yi çağır
+                const response = await fetch(`/api/musteriler-by-temsilci?temsilci=${encodeURIComponent(seciliTemsilci)}`);
+                if (!response.ok) {
+                    throw new Error('Sunucu yanıt vermiyor.');
+                }
+                const musteriler = await response.json();
+
+                musteriSelect.innerHTML = '<option value="">Lütfen bir müşteri seçin...</option>';
+                
+                let oAnkiSecimListedeVar = false;
+                musteriler.forEach(musteri => {
+                    const option = document.createElement('option');
+                    option.value = musteri.FIRMAADI;
+                    option.textContent = musteri.FIRMAADI;
+                    
+                    // Eğer müşteri, filtreleme sonrası yeni listede hala varsa, onu tekrar seçili yap
+                    if (musteri.FIRMAADI === oAnSeciliMusteri) {
+                        option.selected = true;
+                        oAnkiSecimListedeVar = true;
+                    }
+                    
+                    musteriSelect.appendChild(option);
+                });
+                
+                // Eğer önceki seçim yeni listede yoksa, seçimi temizle
+                if (!oAnkiSecimListedeVar) {
+                    musteriSelect.value = "";
+                }
+
+            } catch (error) {
+                console.error('Müşteri listesi güncellenirken bir hata oluştu:', error);
+                musteriSelect.innerHTML = '<option value="">Liste Yüklenemedi!</option>';
+            } finally {
+                musteriSelect.disabled = false;
+            }
+        }
+
+        // Temsilci filtresi her değiştiğinde müşteri listesini güncelle
+        temsilciSelect.addEventListener('change', musteriListesiniGuncelle);
+    });
+</script>
+
+
+<%- include('partials/footer') %>

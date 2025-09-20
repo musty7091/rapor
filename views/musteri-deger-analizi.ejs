@@ -1,0 +1,130 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<style>
+    .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .class-badge {
+        display: inline-block;
+        padding: 0.3rem 0.6rem;
+        border-radius: 1rem;
+        font-weight: bold;
+        color: #fff;
+        font-size: 0.9rem;
+        width: 30px;
+        text-align: center;
+    }
+    .class-A { background-color: var(--positive-color); }
+    .class-B { background-color: var(--warning-color); }
+    .class-C { background-color: #95a5a6; }
+</style>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-crown"></i> <%= sayfaBasligi %></h1>
+
+    <form action="/musteri-deger-analizi" method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="zamanAraligi">Pratik Tarih Aralığı</label>
+            <select name="zamanAraligi" id="zamanAraligi">
+                <option value="manuel" <%= (!filtreler.zamanAraligi || filtreler.zamanAraligi === 'manuel') ? 'selected' : '' %>>Manuel Seçim</option>
+                <option value="bu_ay" <%= (filtreler.zamanAraligi === 'bu_ay') ? 'selected' : '' %>>Bu Ay</option>
+                <option value="gecen_ay" <%= (filtreler.zamanAraligi === 'gecen_ay') ? 'selected' : '' %>>Geçen Ay</option>
+                <option value="bu_yil" <%= (filtreler.zamanAraligi === 'bu_yil') ? 'selected' : '' %>>Bu Yıl</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="baslangicTarihi">Başlangıç Tarihi</label>
+            <input type="date" id="baslangicTarihi" name="baslangicTarihi" value="<%= filtreler.baslangicTarihi || '' %>">
+        </div>
+        <div class="form-group">
+            <label for="bitisTarihi">Bitiş Tarihi</label>
+            <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
+        </div>
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>><%= t.SATISTEMSILCI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+            <a href="/musteri-deger-analizi" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+
+    <% if (sonuclar && sonuclar.length > 0) { %>
+        <div class="kpi-container">
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-coins"></i></div>
+                <div class="info"><h3>Toplam Ciro</h3><div class="value"><%= kpis.toplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-star" style="color: var(--positive-color);"></i></div>
+                <div class="info"><h3>A Sınıfı Müşteri</h3><div class="value"><%= kpis.sayiA %></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-star-half-stroke" style="color: var(--warning-color);"></i></div>
+                <div class="info"><h3>B Sınıfı Müşteri</h3><div class="value"><%= kpis.sayiB %></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-regular fa-star" style="color: #95a5a6;"></i></div>
+                <div class="info"><h3>C Sınıfı Müşteri</h3><div class="value"><%= kpis.sayiC %></div></div>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Sınıf</th>
+                    <th>Müşteri Adı</th>
+                    <th>Toplam Ciro</th>
+                    <th>Toplam Kâr</th>
+                    <th>Kümülatif Ciro %</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% sonuclar.forEach(s => { %>
+                    <tr>
+                        <td><span class="class-badge class-<%= s.Sinif %>"><%= s.Sinif %></span></td>
+                        <td><%= s.FIRMAADI %></td>
+                        <td class="sayisal"><%= s.ToplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                        <td class="sayisal"><%= s.ToplamKar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                        <td class="sayisal karlilik-pozitif"><%= s.KumulatifCiroYuzdesi.toFixed(2) %>%</td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen bir filtreleme yaparak analize başlayın veya filtrelere uygun veri bulunamadı.</p>
+        </div>
+    <% } %>
+</main>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const zamanAraligiSelect = document.getElementById('zamanAraligi');
+        const baslangicInput = document.getElementById('baslangicTarihi');
+        const bitisInput = document.getElementById('bitisTarihi');
+
+        function updateDateInputsState() {
+            const isManual = zamanAraligiSelect.value === 'manuel';
+            baslangicInput.disabled = !isManual;
+            bitisInput.disabled = !isManual;
+        }
+
+        zamanAraligiSelect.addEventListener('change', function() {
+            if (this.value !== 'manuel') {
+                baslangicInput.value = '';
+                bitisInput.value = '';
+            }
+            updateDateInputsState();
+        });
+        
+        updateDateInputsState();
+    });
+</script>
+
+<%- include('partials/footer') %>

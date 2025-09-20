@@ -5,68 +5,12 @@
 
     <h1><i class="fa-solid fa-sack-dollar"></i> <%= sayfaBasligi %></h1>
 
-    <form action="/urun-karlilik" method="GET" class="filter-form">
-        <div class="form-group">
-            <label for="zamanAraligi">Pratik Tarih Aralığı</label>
-            <select name="zamanAraligi" id="zamanAraligi">
-                <option value="manuel" <%= (!filtreler.zamanAraligi || filtreler.zamanAraligi === 'manuel') ? 'selected' : '' %>>Manuel Seçim</option>
-                <option value="bu_ay" <%= (filtreler.zamanAraligi === 'bu_ay') ? 'selected' : '' %>>Bu Ay</option>
-                <option value="gecen_ay" <%= (filtreler.zamanAraligi === 'gecen_ay') ? 'selected' : '' %>>Geçen Ay</option>
-                <option value="bu_yil" <%= (filtreler.zamanAraligi === 'bu_yil') ? 'selected' : '' %>>Bu Yıl</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="baslangicTarihi">Başlangıç Tarihi</label>
-            <input type="date" id="baslangicTarihi" name="baslangicTarihi" value="<%= filtreler.baslangicTarihi || '' %>">
-        </div>
-        <div class="form-group">
-            <label for="bitisTarihi">Bitiş Tarihi</label>
-            <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
-        </div>
-        
-        <div class="form-group">
-            <label for="urun">Ürün</label>
-            <select name="urun" id="urun">
-                <option value="">Tümü</option>
-                <% if (urunler) { urunler.forEach(u => { %>
-                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>><%= u.STOK_ADI %></option>
-                <% }) } %>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label for="kategori">Kategori</label>
-            <select name="kategori" id="kategori">
-                <option value="">Tümü</option>
-                <% if (kategoriler) { kategoriler.forEach(k => { %>
-                    <option value="<%= k.KATEGORI %>" <%= (filtreler.kategori === k.KATEGORI) ? 'selected' : '' %>><%= k.KATEGORI %></option>
-                <% }) } %>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="urun_grubu">Ürün Grubu</label>
-            <select name="urun_grubu" id="urun_grubu">
-                <option value="">Tümü</option>
-                <% if (urunGruplari) { urunGruplari.forEach(ug => { %>
-                    <option value="<%= ug.URUN_GRUBU %>" <%= (filtreler.urun_grubu === ug.URUN_GRUBU) ? 'selected' : '' %>><%= ug.URUN_GRUBU %></option>
-                <% }) } %>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="tedarikci">Tedarikçi</label>
-            <select name="tedarikci" id="tedarikci">
-                <option value="">Tümü</option>
-                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
-                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>><%= t.TEDARIKCI %></option>
-                <% }) } %>
-            </select>
-        </div>
-        
-        <div class="form-actions">
-            <button type="submit">Filtrele</button>
-            <a href="/urun-karlilik" class="reset-button">Sıfırla</a>
-        </div>
-    </form>
+    <%# YENİ BİLGİLENDİRME METNİ %>
+    <div class="info-box" style="background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border-left: 5px solid var(--primary-color);">
+        <p style="font-size: 1.1rem; color: #555;">
+            Bu rapor, <strong>2025</strong> yılına ait <strong>ALİ ERTAN CO LTD</strong> tedarikçisinin ürün karlılığını göstermektedir.
+        </p>
+    </div>
 
     <% if (sonuclar && sonuclar.length > 0) { %>
         <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
@@ -111,7 +55,8 @@
             </tr>
         </thead>
         <tbody>
-             <% if (sonuclar && sonuclar.length > 0) { %>
+            
+            <% if (sonuclar && sonuclar.length > 0) { %>
                 <% sonuclar.forEach(s => { %>
                     <tr>
                         <td><%= s.STOK_ADI %></td>
@@ -123,35 +68,11 @@
                 <% }) %>
             <% } else { %>
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 20px;">Filtre kriterlerine uygun veri bulunamadı.</td>
+                    <td colspan="4" style="text-align: center; padding: 20px;">Belirtilen kriterlere (Yıl: 2025, Tedarikçi: ALİ ERTAN CO LTD) uygun veri bulunamadı.</td>
                 </tr>
             <% } %>
         </tbody>
     </table>
 </main>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const zamanAraligiSelect = document.getElementById('zamanAraligi');
-        const baslangicInput = document.getElementById('baslangicTarihi');
-        const bitisInput = document.getElementById('bitisTarihi');
-
-        function updateDateInputsState() {
-            const isManual = zamanAraligiSelect.value === 'manuel';
-            baslangicInput.disabled = !isManual;
-            bitisInput.disabled = !isManual;
-        }
-
-        zamanAraligiSelect.addEventListener('change', function() {
-            if (this.value !== 'manuel') {
-                baslangicInput.value = '';
-                bitisInput.value = '';
-            }
-            updateDateInputsState();
-        });
-        
-        updateDateInputsState();
-    });
-</script>
 
 <%- include('partials/footer') %>

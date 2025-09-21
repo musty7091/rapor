@@ -24,13 +24,23 @@
             <label for="bitisTarihi">Bitiş Tarihi</label>
             <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
         </div>
+        <%# YENİ EKLENEN FİLTRE %>
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>><%= t.SATISTEMSILCI %></option>
+                <% }) } %>
+            </select>
+        </div>
         <div class="form-actions">
             <button type="submit">Analiz Et</button>
             <a href="/musteri-bagimliligi" class="reset-button">Sıfırla</a>
         </div>
     </form>
     
-    <% if (kpis) { %>
+    <% if (kpis && kpis.toplamCiro > 0) { %>
         <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
             <div class="kpi-card"><div class="info"><h3>Toplam Ciro</h3><div class="value"><%= kpis.toplamCiro.toLocaleString('tr-TR', {style:'currency', currency:'TRY'}) %></div></div></div>
             <div class="kpi-card"><div class="info"><h3>Top 1 Müşteri Payı</h3><div class="value" style="color: var(--negative-color);"><%= kpis.top1Payi.toFixed(2) %>%</div></div></div>
@@ -59,12 +69,36 @@
                 <% }) %>
             </tbody>
         </table>
+    <% } else { %>
+         <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Filtre kriterlerine uygun veri bulunamadı.</p>
+        </div>
     <% } %>
 
 </main>
 
 <script>
-    // ... (Zaman aralığı script'i buraya gelecek) ...
+    document.addEventListener('DOMContentLoaded', function() {
+        const zamanAraligiSelect = document.getElementById('zamanAraligi');
+        const baslangicInput = document.getElementById('baslangicTarihi');
+        const bitisInput = document.getElementById('bitisTarihi');
+
+        function updateDateInputsState() {
+            const isManual = zamanAraligiSelect.value === 'manuel';
+            baslangicInput.disabled = !isManual;
+            bitisInput.disabled = !isManual;
+        }
+
+        zamanAraligiSelect.addEventListener('change', function() {
+            if (this.value !== 'manuel') {
+                baslangicInput.value = '';
+                bitisInput.value = '';
+            }
+            updateDateInputsState();
+        });
+        
+        updateDateInputsState();
+    });
 </script>
 
 <%- include('partials/footer') %>

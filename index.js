@@ -913,9 +913,10 @@ app.get('/fiyat-esnekligi', async (req, res) => {
 // Fikir 2: Müşteri Bağımlılığı Riski
 app.get('/musteri-bagimliligi', async (req, res) => {
      try {
-        // DÜZELTME: Eksik olan 'pool' değişkeni eklendi.
         const pool = await poolPromise;
-        let { baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
+        let { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
+
+        const { temsilciler } = await getFilterData(['temsilciler']);
 
         if (!zamanAraligi) zamanAraligi = 'bu_yil';
         if (zamanAraligi && zamanAraligi !== 'manuel') {
@@ -926,26 +927,30 @@ app.get('/musteri-bagimliligi', async (req, res) => {
             }
         }
 
-        // DÜZELTME: 'request' objesi başta tanımlandı.
         const request = pool.request();
         let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
+        
         if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
         if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+        if (temsilci) { whereClauses += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
 
         const query = `
             WITH MusteriCiro AS (
                 SELECT
                     FIRMAADI,
-                    SUM(TUTAR) as ToplamCiro
+                    SUM(TUTAR) as ToplamCiro,
+                    ROW_NUMBER() OVER (ORDER BY SUM(TUTAR) DESC) as Sira
                 FROM YC_SATIS_DETAY
                 ${whereClauses}
                 GROUP BY FIRMAADI
             )
-            SELECT TOP 10
+            SELECT 
                 FIRMAADI,
                 ToplamCiro,
-                ROW_NUMBER() OVER (ORDER BY ToplamCiro DESC) as Sira
-            FROM MusteriCiro;
+                Sira
+            FROM MusteriCiro 
+            WHERE Sira <= 10
+            ORDER BY Sira;
         `;
         const top10Result = await request.query(query);
         const genelToplamResult = await request.query(`SELECT SUM(TUTAR) as GenelToplamCiro FROM YC_SATIS_DETAY ${whereClauses}`);
@@ -957,9 +962,10 @@ app.get('/musteri-bagimliligi', async (req, res) => {
         if (toplamCiro > 0 && sonuclar.length > 0) {
             let top1Ciro = 0, top5Ciro = 0, top10Ciro = 0;
             sonuclar.forEach(s => {
-                if(s.Sira === 1) top1Ciro += s.ToplamCiro;
-                if(s.Sira <= 5) top5Ciro += s.ToplamCiro;
-                if(s.Sira <= 10) top10Ciro += s.ToplamCiro;
+                // DÜZELTME: 'Sira' değeri 'parseInt' ile sayıya çevrilerek karşılaştırılıyor.
+                if(parseInt(s.Sira) === 1) top1Ciro += s.ToplamCiro;
+                if(parseInt(s.Sira) <= 5) top5Ciro += s.ToplamCiro;
+                if(parseInt(s.Sira) <= 10) top10Ciro += s.ToplamCiro;
             });
             kpis.top1Payi = (top1Ciro / toplamCiro) * 100;
             kpis.top5Payi = (top5Ciro / toplamCiro) * 100;
@@ -970,7 +976,8 @@ app.get('/musteri-bagimliligi', async (req, res) => {
             sayfaBasligi: 'Müşteri Bağımlılığı Riski',
             sonuclar,
             kpis,
-            filtreler: { baslangicTarihi, bitisTarihi, zamanAraligi }
+            temsilciler,
+            filtreler: { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi }
         });
 
     } catch (err) {

@@ -639,6 +639,488 @@ app.get('/musteri-deger-analizi', async (req, res) => {
     }
 });
 
+app.get('/kayip-musteri-analizi', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { temsilci, tedarikci } = req.query;
+
+        const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
+
+        let sonuclar = [];
+        let kpis = { toplamKayipMusteri: 0, toplamKayipCiro: 0 };
+
+        const request = pool.request();
+        
+        let subQueryFilter = '';
+        if (temsilci) {
+            subQueryFilter += ' AND SATISTEMSILCI = @temsilciParam';
+            request.input('temsilciParam', sql.NVarChar, temsilci);
+        }
+        if (tedarikci) {
+            subQueryFilter += ' AND TEDARIKCI = @tedarikciParam';
+            request.input('tedarikciParam', sql.NVarChar, tedarikci);
+        }
+
+        const churnQuery = `
+            WITH Musteriler2024 AS (
+                SELECT DISTINCT FIRMAADI 
+                FROM YC_SATIS_DETAY 
+                WHERE YIL = 2024 ${subQueryFilter}
+            ),
+            Musteriler2025 AS (
+                SELECT DISTINCT FIRMAADI 
+                FROM YC_SATIS_DETAY 
+                WHERE YIL = 2025 ${subQueryFilter}
+            ),
+            KayipMusteriler AS (
+                SELECT FIRMAADI FROM Musteriler2024
+                EXCEPT
+                SELECT FIRMAADI FROM Musteriler2025
+            )
+            SELECT 
+                km.FIRMAADI,
+                SUM(s.TUTAR) AS KaybedilenCiro2024,
+                MAX(s.TARIH) AS SonSiparisTarihi2024,
+                MAX(s.SATISTEMSILCI) AS SorumluTemsilci
+            FROM YC_SATIS_DETAY s
+            JOIN KayipMusteriler km ON s.FIRMAADI = km.FIRMAADI
+            WHERE s.YIL = 2024
+            GROUP BY km.FIRMAADI
+            ORDER BY KaybedilenCiro2024 DESC;
+        `;
+        
+        const result = await request.query(churnQuery);
+        sonuclar = result.recordset;
+
+        if (sonuclar.length > 0) {
+            kpis.toplamKayipMusteri = sonuclar.length;
+            kpis.toplamKayipCiro = sonuclar.reduce((sum, s) => sum + s.KaybedilenCiro2024, 0);
+        }
+
+        res.render('kayip-musteri-analizi', {
+            sayfaBasligi: 'Kayıp Müşteri Analizi (Churn)',
+            sonuclar,
+            kpis,
+            temsilciler,
+            tedarikciler,
+            filtreler: { temsilci, tedarikci }
+        });
+
+    } catch (err) {
+        console.error("Hata - Kayıp Müşteri Analizi: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+app.get('/karlilik-marji-analizi', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        let { gruplama, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
+
+        // Varsayılan gruplama kriteri
+        if (!gruplama) gruplama = 'temsilci';
+
+        if (zamanAraligi && zamanAraligi !== 'manuel') {
+            const range = getDateRange(zamanAraligi);
+            if (range) {
+                baslangicTarihi = range.startDate;
+                bitisTarihi = range.endDate;
+            }
+        }
+        
+        // Dinamik sorgu için sütun adlarını belirle
+        let groupByColumn = '';
+        switch(gruplama) {
+            case 'musteri':
+                groupByColumn = 'FIRMAADI';
+                break;
+            case 'kategori':
+                groupByColumn = 'KATEGORI';
+                break;
+            default:
+                groupByColumn = 'SATISTEMSILCI';
+        }
+
+        const request = pool.request();
+        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
+        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+
+        const marginQuery = `
+            ${KARLILIK_HESAPLAMA_CTE}
+            SELECT
+                ${groupByColumn},
+                SUM(TUTAR) as ToplamCiro,
+                SUM(TUTAR - (MIKTAR * DogruBirimMaliyet)) as ToplamKar,
+                CASE 
+                    WHEN SUM(TUTAR) = 0 THEN 0
+                    ELSE (SUM(TUTAR - (MIKTAR * DogruBirimMaliyet)) * 100.0) / SUM(TUTAR)
+                END as KarMarji
+            FROM AnaVeri
+            ${whereClauses}
+            GROUP BY ${groupByColumn}
+            HAVING ${groupByColumn} IS NOT NULL
+            ORDER BY KarMarji DESC;
+        `;
+
+        const result = await request.query(marginQuery);
+        
+        res.render('karlilik-marji-analizi', {
+            sayfaBasligi: 'Kârlılık Marjı Analizi',
+            sonuclar: result.recordset,
+            filtreler: { gruplama, baslangicTarihi, bitisTarihi, zamanAraligi },
+            groupByColumn: groupByColumn // Bu, EJS'de doğru sütunu yazdırmak için
+        });
+
+    } catch (err) {
+        console.error("Hata - Kârlılık Marjı Analizi: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+
+        const scorecardQuery = `
+            ${KARLILIK_HESAPLAMA_CTE},
+            -- 1. 2025 Ciro ve Kar Marjı
+            TemsilciCiroKar2025 AS (
+                SELECT
+                    SATISTEMSILCI,
+                    SUM(TUTAR) as ToplamCiro,
+                    CASE 
+                        WHEN SUM(TUTAR) = 0 THEN 0
+                        ELSE (SUM(TUTAR - (MIKTAR * DogruBirimMaliyet)) * 100.0) / SUM(TUTAR)
+                    END as KarMarji
+                FROM AnaVeri
+                WHERE YIL = 2025 AND SATISTEMSILCI IS NOT NULL
+                GROUP BY SATISTEMSILCI
+            ),
+            -- 2. Müşteri Tutma Oranı
+            TemsilciMusterileri2024 AS (
+                SELECT SATISTEMSILCI, FIRMAADI FROM YC_SATIS_DETAY WHERE YIL = 2024 AND SATISTEMSILCI IS NOT NULL GROUP BY SATISTEMSILCI, FIRMAADI
+            ),
+            TemsilciMusterileri2025 AS (
+                SELECT SATISTEMSILCI, FIRMAADI FROM YC_SATIS_DETAY WHERE YIL = 2025 AND SATISTEMSILCI IS NOT NULL GROUP BY SATISTEMSILCI, FIRMAADI
+            ),
+            MusteriTutma AS (
+                SELECT
+                    t24.SATISTEMSILCI,
+                    (COUNT(t25.FIRMAADI) * 100.0) / COUNT(t24.FIRMAADI) as MusteriTutmaOrani
+                FROM TemsilciMusterileri2024 t24
+                LEFT JOIN TemsilciMusterileri2025 t25 ON t24.SATISTEMSILCI = t25.SATISTEMSILCI AND t24.FIRMAADI = t25.FIRMAADI
+                GROUP BY t24.SATISTEMSILCI
+            ),
+            -- 3. Yeni Müşteri Kazanımı
+            YeniMusteriler AS (
+                SELECT SATISTEMSILCI, COUNT(*) as YeniMusteriSayisi FROM (
+                    SELECT SATISTEMSILCI, FIRMAADI FROM TemsilciMusterileri2025
+                    EXCEPT
+                    SELECT SATISTEMSILCI, FIRMAADI FROM TemsilciMusterileri2024
+                ) AS T
+                GROUP BY SATISTEMSILCI
+            ),
+            -- 4. A Sınıfı Müşteri Sayısı
+            MusteriCiro2025 AS (
+                SELECT FIRMAADI, SUM(TUTAR) as ToplamCiro
+                FROM YC_SATIS_DETAY WHERE YIL = 2025 GROUP BY FIRMAADI
+            ),
+            GenelToplam2025 AS (
+                SELECT SUM(ToplamCiro) as GenelToplamCiro FROM MusteriCiro2025
+            ),
+            MusteriSiniflari AS (
+                SELECT
+                    FIRMAADI,
+                    CASE WHEN (SUM(ToplamCiro) OVER (ORDER BY ToplamCiro DESC, FIRMAADI) * 100.0) / GenelToplamCiro <= 80 THEN 'A' ELSE 'B' END as Sinif
+                FROM MusteriCiro2025, GenelToplam2025
+            ),
+            A_SinifiSayisi AS (
+                SELECT s.SATISTEMSILCI, COUNT(DISTINCT s.FIRMAADI) AS A_SinifiMusteriSayisi
+                FROM YC_SATIS_DETAY s
+                JOIN MusteriSiniflari ms ON s.FIRMAADI = ms.FIRMAADI
+                WHERE s.YIL = 2025 AND ms.Sinif = 'A' AND s.SATISTEMSILCI IS NOT NULL
+                GROUP BY s.SATISTEMSILCI
+            )
+            -- Final Sonuçları Birleştirme
+            SELECT 
+                t.SATISTEMSILCI,
+                ISNULL(ck.ToplamCiro, 0) as ToplamCiro,
+                ISNULL(ck.KarMarji, 0) as KarMarji,
+                ISNULL(mt.MusteriTutmaOrani, 0) as MusteriTutmaOrani,
+                ISNULL(ym.YeniMusteriSayisi, 0) as YeniMusteriSayisi,
+                ISNULL(a.A_SinifiMusteriSayisi, 0) as A_SinifiMusteriSayisi
+            FROM (SELECT DISTINCT SATISTEMSILCI FROM YC_SATIS_DETAY WHERE SATISTEMSILCI IS NOT NULL) t
+            LEFT JOIN TemsilciCiroKar2025 ck ON t.SATISTEMSILCI = ck.SATISTEMSILCI
+            LEFT JOIN MusteriTutma mt ON t.SATISTEMSILCI = mt.SATISTEMSILCI
+            LEFT JOIN YeniMusteriler ym ON t.SATISTEMSILCI = ym.SATISTEMSILCI
+            LEFT JOIN A_SinifiSayisi a ON t.SATISTEMSILCI = a.SATISTEMSILCI
+            ORDER BY ck.ToplamCiro DESC;
+        `;
+
+        const result = await pool.request().query(scorecardQuery);
+        
+        res.render('temsilci-etkinlik-karnesi', {
+            sayfaBasligi: 'Temsilci Etkinlik Karnesi',
+            sonuclar: result.recordset
+        });
+
+    } catch (err) {
+        console.error("Hata - Temsilci Etkinlik Karnesi: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+// Fikir 1: Fiyat Esnekliği Analizi
+app.get('/fiyat-esnekligi', async (req, res) => {
+    try {
+        const { urun } = req.query;
+        const { urunler } = await getFilterData(['urunler']);
+
+        let sonuclar = [];
+        if (urun) {
+            // DÜZELTME: Eksik olan 'pool' değişkeni eklendi.
+            const pool = await poolPromise;
+            const request = pool.request();
+            request.input('urunParam', sql.NVarChar, urun);
+            const query = `
+                SELECT
+                    YIL,
+                    AY,
+                    AVG(TUTAR / NULLIF(MIKTAR, 0)) as OrtalamaBirimFiyat,
+                    SUM(MIKTAR) as ToplamMiktar
+                FROM YC_SATIS_DETAY
+                WHERE STOK_ADI = @urunParam AND MIKTAR > 0 AND TUTAR > 0
+                GROUP BY YIL, AY
+                ORDER BY YIL, AY;
+            `;
+            const result = await request.query(query);
+            sonuclar = result.recordset;
+        }
+
+        res.render('fiyat-esnekligi', {
+            sayfaBasligi: 'Fiyat Esnekliği Analizi',
+            urunler,
+            sonuclar,
+            filtreler: { urun }
+        });
+    } catch (err) {
+        console.error("Hata - Fiyat Esnekliği: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+// Fikir 2: Müşteri Bağımlılığı Riski
+app.get('/musteri-bagimliligi', async (req, res) => {
+     try {
+        // DÜZELTME: Eksik olan 'pool' değişkeni eklendi.
+        const pool = await poolPromise;
+        let { baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
+
+        if (!zamanAraligi) zamanAraligi = 'bu_yil';
+        if (zamanAraligi && zamanAraligi !== 'manuel') {
+            const range = getDateRange(zamanAraligi);
+            if (range) {
+                baslangicTarihi = range.startDate;
+                bitisTarihi = range.endDate;
+            }
+        }
+
+        // DÜZELTME: 'request' objesi başta tanımlandı.
+        const request = pool.request();
+        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
+        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+
+        const query = `
+            WITH MusteriCiro AS (
+                SELECT
+                    FIRMAADI,
+                    SUM(TUTAR) as ToplamCiro
+                FROM YC_SATIS_DETAY
+                ${whereClauses}
+                GROUP BY FIRMAADI
+            )
+            SELECT TOP 10
+                FIRMAADI,
+                ToplamCiro,
+                ROW_NUMBER() OVER (ORDER BY ToplamCiro DESC) as Sira
+            FROM MusteriCiro;
+        `;
+        const top10Result = await request.query(query);
+        const genelToplamResult = await request.query(`SELECT SUM(TUTAR) as GenelToplamCiro FROM YC_SATIS_DETAY ${whereClauses}`);
+        
+        const sonuclar = top10Result.recordset;
+        const toplamCiro = genelToplamResult.recordset[0].GenelToplamCiro || 0;
+
+        let kpis = { toplamCiro: toplamCiro, top1Payi: 0, top5Payi: 0, top10Payi: 0 };
+        if (toplamCiro > 0 && sonuclar.length > 0) {
+            let top1Ciro = 0, top5Ciro = 0, top10Ciro = 0;
+            sonuclar.forEach(s => {
+                if(s.Sira === 1) top1Ciro += s.ToplamCiro;
+                if(s.Sira <= 5) top5Ciro += s.ToplamCiro;
+                if(s.Sira <= 10) top10Ciro += s.ToplamCiro;
+            });
+            kpis.top1Payi = (top1Ciro / toplamCiro) * 100;
+            kpis.top5Payi = (top5Ciro / toplamCiro) * 100;
+            kpis.top10Payi = (top10Ciro / toplamCiro) * 100;
+        }
+
+        res.render('musteri-bagimliligi', {
+            sayfaBasligi: 'Müşteri Bağımlılığı Riski',
+            sonuclar,
+            kpis,
+            filtreler: { baslangicTarihi, bitisTarihi, zamanAraligi }
+        });
+
+    } catch (err) {
+        console.error("Hata - Müşteri Bağımlılığı: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+
+// Fikir 3: Ürün Kanibalizasyon Analizi
+app.get('/urun-kanibalizasyon', async (req, res) => {
+    try {
+        const { eski_urun, yeni_urun } = req.query;
+        const { urunler } = await getFilterData(['urunler']);
+
+        let chartData = null;
+        if (eski_urun && yeni_urun) {
+            const pool = await poolPromise;
+            const request = pool.request();
+            request.input('eskiUrun', sql.NVarChar, eski_urun);
+            request.input('yeniUrun', sql.NVarChar, yeni_urun);
+
+            const lansmanResult = await pool.request().input('yeniUrun', sql.NVarChar, yeni_urun).query('SELECT MIN(TARIH) as LansmanTarihi FROM YC_SATIS_DETAY WHERE STOK_ADI = @yeniUrun');
+            const lansmanTarihi = lansmanResult.recordset[0].LansmanTarihi;
+            
+            const salesQuery = `
+                SELECT STOK_ADI, YIL, AY, SUM(MIKTAR) as ToplamMiktar
+                FROM YC_SATIS_DETAY
+                WHERE STOK_ADI IN (@eskiUrun, @yeniUrun)
+                GROUP BY STOK_ADI, YIL, AY
+                ORDER BY YIL, AY;
+            `;
+            const salesResult = await request.query(salesQuery);
+
+            if (salesResult.recordset.length > 0) {
+                const labels = [];
+                const eskiUrunData = [];
+                const yeniUrunData = [];
+                const salesMap = new Map();
+                salesResult.recordset.forEach(r => {
+                    const key = `${r.YIL}-${String(r.AY).padStart(2, '0')}`;
+                    if(!salesMap.has(key)) salesMap.set(key, {});
+                    salesMap.get(key)[r.STOK_ADI] = r.ToplamMiktar;
+                });
+
+                for (let y = 2024; y <= 2025; y++) {
+                    for (let m = 1; m <= 12; m++) {
+                        const key = `${y}-${String(m).padStart(2, '0')}`;
+                        labels.push(`${key}-01`); // For time scale
+                        eskiUrunData.push(salesMap.get(key)?.[eski_urun] || 0);
+                        yeniUrunData.push(salesMap.get(key)?.[yeni_urun] || 0);
+                    }
+                }
+                chartData = { labels, eskiUrunData, yeniUrunData, lansmanTarihi };
+            }
+        }
+        
+        res.render('urun-kanibalizasyon', {
+            sayfaBasligi: 'Ürün Kanibalizasyon Analizi',
+            urunler,
+            chartData,
+            filtreler: { eski_urun, yeni_urun }
+        });
+    } catch (err) {
+        console.error("Hata - Ürün Kanibalizasyon: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+app.get('/musteri-siparis-riski', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { temsilci } = req.query;
+
+        const { temsilciler } = await getFilterData(['temsilciler']);
+
+        let sonuclar = [];
+        let kpis = { toplamMusteri: 0, guvenliSayisi: 0, riskliSayisi: 0, cokRiskliSayisi: 0 };
+
+        const request = pool.request();
+        
+        let whereClauses = 'WHERE YIL IN (2024, 2025)';
+        if (temsilci) {
+            whereClauses += ' AND SATISTEMSILCI = @temsilciParam';
+            request.input('temsilciParam', sql.NVarChar, temsilci);
+        }
+
+        const riskQuery = `
+            WITH SiparisGunleri AS (
+                SELECT FIRMAADI, TARIH
+                FROM YC_SATIS_DETAY
+                ${whereClauses}
+                GROUP BY FIRMAADI, TARIH
+            ),
+            SiparisAraliklari AS (
+                SELECT
+                    FIRMAADI,
+                    TARIH,
+                    DATEDIFF(day, LAG(TARIH, 1) OVER (PARTITION BY FIRMAADI ORDER BY TARIH), TARIH) as SiparisAraligi
+                FROM SiparisGunleri
+            ),
+            MusteriIstatistikleri AS (
+                SELECT
+                    FIRMAADI,
+                    AVG(CAST(SiparisAraligi AS FLOAT)) AS OrtalamaSiparisAraligi,
+                    MAX(TARIH) AS SonSiparisTarihi,
+                    COUNT(TARIH) AS ToplamSiparisGunuSayisi
+                FROM SiparisAraliklari
+                GROUP BY FIRMAADI
+            )
+            SELECT
+                FIRMAADI,
+                ISNULL(OrtalamaSiparisAraligi, 0) AS OrtalamaSiparisAraligi,
+                SonSiparisTarihi,
+                DATEDIFF(day, SonSiparisTarihi, GETDATE()) AS SonSiparistenGecenSure,
+                CASE
+                    WHEN DATEDIFF(day, SonSiparisTarihi, GETDATE()) > (ISNULL(OrtalamaSiparisAraligi, 365) * 2) THEN 'Cok Riskli'
+                    WHEN DATEDIFF(day, SonSiparisTarihi, GETDATE()) > (ISNULL(OrtalamaSiparisAraligi, 365) * 1.5) THEN 'Riskli'
+                    ELSE 'Guvenli'
+                END AS RiskDurumu
+            FROM MusteriIstatistikleri
+            WHERE ToplamSiparisGunuSayisi > 1
+            ORDER BY RiskDurumu, SonSiparistenGecenSure DESC;
+        `;
+        
+        const result = await request.query(riskQuery);
+        sonuclar = result.recordset;
+
+        if (sonuclar.length > 0) {
+            kpis.toplamMusteri = sonuclar.length;
+            sonuclar.forEach(s => {
+                if (s.RiskDurumu === 'Guvenli') kpis.guvenliSayisi++;
+                else if (s.RiskDurumu === 'Riskli') kpis.riskliSayisi++;
+                else kpis.cokRiskliSayisi++;
+            });
+        }
+
+        res.render('musteri-siparis-riski', {
+            sayfaBasligi: 'Müşteri Sipariş Riski Analizi',
+            sonuclar,
+            kpis,
+            temsilciler,
+            filtreler: { temsilci }
+        });
+
+    } catch (err) {
+        console.error("Hata - Müşteri Sipariş Riski: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
 
 // === API ROTALARI ===
 app.get('/api/musteriler-by-temsilci', async (req, res) => {

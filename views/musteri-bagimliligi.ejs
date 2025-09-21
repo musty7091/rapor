@@ -1,0 +1,70 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-link"></i> Müşteri Bağımlılığı Riski</h1>
+     <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
+        Toplam cironun ne kadarının kilit müşterilerden geldiğini analiz ederek risk konsantrasyonunu ölçer.
+    </p>
+
+    <form action="/musteri-bagimliligi" method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="zamanAraligi">Pratik Tarih Aralığı</label>
+            <select name="zamanAraligi" id="zamanAraligi">
+                <option value="bu_yil" <%= (filtreler.zamanAraligi === 'bu_yil') ? 'selected' : '' %>>Bu Yıl</option>
+                <option value="gecen_ay" <%= (filtreler.zamanAraligi === 'gecen_ay') ? 'selected' : '' %>>Geçen Ay</option>
+                <option value="manuel" <%= (!filtreler.zamanAraligi || filtreler.zamanAraligi === 'manuel') ? 'selected' : '' %>>Manuel Seçim</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="baslangicTarihi">Başlangıç Tarihi</label>
+            <input type="date" id="baslangicTarihi" name="baslangicTarihi" value="<%= filtreler.baslangicTarihi || '' %>">
+        </div>
+        <div class="form-group">
+            <label for="bitisTarihi">Bitiş Tarihi</label>
+            <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
+        </div>
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+            <a href="/musteri-bagimliligi" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+    
+    <% if (kpis) { %>
+        <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="kpi-card"><div class="info"><h3>Toplam Ciro</h3><div class="value"><%= kpis.toplamCiro.toLocaleString('tr-TR', {style:'currency', currency:'TRY'}) %></div></div></div>
+            <div class="kpi-card"><div class="info"><h3>Top 1 Müşteri Payı</h3><div class="value" style="color: var(--negative-color);"><%= kpis.top1Payi.toFixed(2) %>%</div></div></div>
+            <div class="kpi-card"><div class="info"><h3>Top 5 Müşteri Payı</h3><div class="value" style="color: var(--warning-color);"><%= kpis.top5Payi.toFixed(2) %>%</div></div></div>
+            <div class="kpi-card"><div class="info"><h3>Top 10 Müşteri Payı</h3><div class="value" style="color: var(--primary-color);"><%= kpis.top10Payi.toFixed(2) %>%</div></div></div>
+        </div>
+
+        <h2>Top 10 Müşteri Listesi</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sıra</th>
+                    <th>Müşteri Adı</th>
+                    <th>Toplam Ciro</th>
+                    <th>Ciro Payı %</th>
+                </tr>
+            </thead>
+            <tbody>
+                 <% sonuclar.forEach(s => { %>
+                    <tr>
+                        <td><%= s.Sira %></td>
+                        <td><%= s.FIRMAADI %></td>
+                        <td class="sayisal"><%= s.ToplamCiro.toLocaleString('tr-TR', {style:'currency', currency:'TRY'}) %></td>
+                        <td class="sayisal karlilik-pozitif"><%= (s.ToplamCiro / kpis.toplamCiro * 100).toFixed(2) %>%</td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    <% } %>
+
+</main>
+
+<script>
+    // ... (Zaman aralığı script'i buraya gelecek) ...
+</script>
+
+<%- include('partials/footer') %>

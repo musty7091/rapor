@@ -1,0 +1,80 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-user-slash"></i> <%= sayfaBasligi %></h1>
+    <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">2024'te siparişi olan ancak 2025'te hiç siparişi olmayan müşterileri listeler.</p>
+
+    <form action="/kayip-musteri-analizi" method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>><%= t.SATISTEMSILCI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>><%= t.TEDARIKCI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+            <a href="/kayip-musteri-analizi" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+
+    <% if (sonuclar) { %>
+        <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="kpi-card">
+                <div class="icon" style="color: var(--negative-color);"><i class="fa-solid fa-users-slash"></i></div>
+                <div class="info">
+                    <h3>Toplam Kayıp Müşteri</h3>
+                    <div class="value"><%= kpis.toplamKayipMusteri %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="icon"><i class="fa-solid fa-coins"></i></div>
+                <div class="info">
+                    <h3>Toplam Kaybedilen Ciro (2024)</h3>
+                    <div class="value"><%= kpis.toplamKayipCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+                </div>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Müşteri Adı</th>
+                    <th>Kaybedilen Ciro (2024)</th>
+                    <th>Sorumlu Temsilci (2024)</th>
+                    <th>Son Sipariş Tarihi (2024)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (sonuclar.length > 0) { %>
+                    <% sonuclar.forEach(s => { %>
+                        <tr>
+                            <td><%= s.FIRMAADI %></td>
+                            <td class="sayisal karlilik-negatif"><%= s.KaybedilenCiro2024.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                            <td><%= s.SorumluTemsilci %></td>
+                            <td class="sayisal"><%= new Date(s.SonSiparisTarihi2024).toLocaleDateString('tr-TR') %></td>
+                        </tr>
+                    <% }) %>
+                <% } else { %>
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 20px;">Filtre kriterlerine uygun kayıp müşteri bulunamadı.</td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>

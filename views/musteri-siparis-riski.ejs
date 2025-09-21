@@ -1,0 +1,89 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<style>
+    .risk-badge {
+        display: inline-block;
+        padding: 0.3rem 0.8rem;
+        border-radius: 1rem;
+        font-weight: bold;
+        color: #fff;
+        font-size: 0.85rem;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .risk-Guvenli { background-color: var(--positive-color); }
+    .risk-Riskli { background-color: var(--warning-color); }
+    .risk-CokRiskli { background-color: var(--negative-color); }
+
+    .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+</style>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-user-clock"></i> <%= sayfaBasligi %></h1>
+    <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
+        Müşterilerin sipariş sıklığını analiz eder ve normalin dışında süre sipariş vermeyenleri "Riskli" olarak işaretler.
+    </p>
+
+    <form action="/musteri-siparis-riski" method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>><%= t.SATISTEMSILCI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit">Filtrele</button>
+            <a href="/musteri-siparis-riski" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+
+    <% if (sonuclar) { %>
+        <div class="kpi-container">
+            <div class="kpi-card">
+                <div class="info"><h3>Analiz Edilen Müşteri</h3><div class="value"><%= kpis.toplamMusteri %></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="info"><h3>Güvenli Müşteri</h3><div class="value" style="color: var(--positive-color);"><%= kpis.guvenliSayisi %></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="info"><h3>Riskli Müşteri</h3><div class="value" style="color: var(--warning-color);"><%= kpis.riskliSayisi %></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="info"><h3>Çok Riskli Müşteri</h3><div class="value" style="color: var(--negative-color);"><%= kpis.cokRiskliSayisi %></div></div>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Risk Durumu</th>
+                    <th>Müşteri Adı</th>
+                    <th>Ort. Sipariş Aralığı (Gün)</th>
+                    <th>Son Sipariş Tarihi</th>
+                    <th>Son Siparişten Geçen Süre (Gün)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (sonuclar.length > 0) { %>
+                    <% sonuclar.forEach(s => { %>
+                        <tr>
+                            <td><span class="risk-badge risk-<%= s.RiskDurumu.replace(' ', '') %>"><%= s.RiskDurumu %></span></td>
+                            <td><%= s.FIRMAADI %></td>
+                            <td class="sayisal"><%= s.OrtalamaSiparisAraligi.toFixed(0) %> gün</td>
+                            <td class="sayisal"><%= new Date(s.SonSiparisTarihi).toLocaleDateString('tr-TR') %></td>
+                            <td class="sayisal"><%= s.SonSiparistenGecenSure %> gün</td>
+                        </tr>
+                    <% }) %>
+                <% } else { %>
+                    <td colspan="5" style="text-align: center; padding: 20px;">Analiz için yeterli sipariş geçmişine sahip müşteri bulunamadı.</td>
+                <% } %>
+            </tbody>
+        </table>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,97 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-chart-bar"></i> Fiyat Esnekliği Analizi</h1>
+    <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
+        Seçilen bir ürünün aylık ortalama satış fiyatı ile satış hacmi arasındaki ilişkiyi gösterir.
+    </p>
+
+    <form action="/fiyat-esnekligi" method="GET" class="filter-form">
+        <div class="form-group" style="flex-grow: 2;">
+            <label for="urun">Analiz Edilecek Ürün</label>
+            <select name="urun" id="urun" required>
+                <option value="">Lütfen bir ürün seçin...</option>
+                <% if (urunler) { urunler.forEach(u => { %>
+                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>><%= u.STOK_ADI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+        </div>
+    </form>
+
+    <% if (sonuclar && sonuclar.length > 0) { %>
+        <div class="chart-container" style="background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <canvas id="elasticityChart"></canvas>
+        </div>
+    <% } else if (filtreler.urun) { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Seçilen ürün için analiz edilecek veri bulunamadı.</p>
+        </div>
+    <% } %>
+</main>
+
+<% if (sonuclar && sonuclar.length > 0) { %>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('elasticityChart').getContext('2d');
+        const chartData = <%- JSON.stringify(sonuclar) %>;
+        
+        const labels = chartData.map(d => `${d.YIL}-${String(d.AY).padStart(2, '0')}`);
+        const fiyatData = chartData.map(d => d.OrtalamaBirimFiyat);
+        const miktarData = chartData.map(d => d.ToplamMiktar);
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Ortalama Birim Fiyat (TL)',
+                        data: fiyatData,
+                        type: 'line',
+                        borderColor: 'rgba(231, 76, 60, 1)',
+                        backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                        yAxisID: 'y-fiyat',
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Toplam Satış Miktarı (Adet)',
+                        data: miktarData,
+                        backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                        borderColor: 'rgba(41, 128, 185, 1)',
+                        yAxisID: 'y-miktar',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: { display: true, text: '<%= filtreler.urun %> - Fiyat ve Hacim İlişkisi' },
+                    legend: { position: 'top' },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { stacked: true },
+                    'y-fiyat': {
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: 'Ortalama Birim Fiyat (TL)'}
+                    },
+                    'y-miktar': {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Toplam Miktar'},
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+    });
+</script>
+<% } %>
+
+<%- include('partials/footer') %>

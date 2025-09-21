@@ -1,0 +1,102 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<style>
+    .scorecard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 1.5rem;
+    }
+    .scorecard {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+    }
+    .scorecard-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        background-color: #f8f9fa;
+    }
+    .scorecard-header h2 {
+        font-size: 1.2rem;
+        color: var(--secondary-color);
+        margin: 0;
+    }
+    .scorecard-body {
+        padding: 1.5rem;
+        display: grid;
+        gap: 1.2rem;
+    }
+    .metric {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 0.8rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .metric:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    .metric-label {
+        font-weight: 500;
+        color: #555;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .metric-value {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: var(--primary-color);
+    }
+</style>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-id-card-clip"></i> <%= sayfaBasligi %></h1>
+    <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
+        Temsilcilerin 2025 yılı performansını, 2024 verileriyle karşılaştırarak çok boyutlu olarak ölçer.
+    </p>
+
+    <% if (sonuclar && sonuclar.length > 0) { %>
+        <div class="scorecard-grid">
+            <% sonuclar.forEach(s => { %>
+                <div class="scorecard">
+                    <div class="scorecard-header">
+                        <h2><%= s.SATISTEMSILCI %></h2>
+                    </div>
+                    <div class="scorecard-body">
+                        <div class="metric">
+                            <span class="metric-label"><i class="fa-solid fa-coins"></i> Toplam Ciro (2025)</span>
+                            <span class="metric-value"><%= s.ToplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label"><i class="fa-solid fa-percent"></i> Ort. Kâr Marjı (2025)</span>
+                            <span class="metric-value karlilik-pozitif"><%= s.KarMarji.toFixed(2) %>%</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label"><i class="fa-solid fa-handshake"></i> Müşteri Tutma Oranı</span>
+                            <span class="metric-value"><%= s.MusteriTutmaOrani.toFixed(2) %>%</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label"><i class="fa-solid fa-user-plus"></i> Yeni Müşteri Sayısı</span>
+                            <span class="metric-value"><%= s.YeniMusteriSayisi %></span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label"><i class="fa-solid fa-crown"></i> Yönettiği A Sınıfı Müşteri</span>
+                            <span class="metric-value"><%= s.A_SinifiMusteriSayisi %></span>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Raporu oluşturmak için yeterli veri bulunamadı.</p>
+        </div>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>

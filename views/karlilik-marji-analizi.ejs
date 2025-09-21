@@ -1,0 +1,95 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-magnifying-glass-dollar"></i> <%= sayfaBasligi %></h1>
+
+    <form action="/karlilik-marji-analizi" method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="gruplama">Gruplama Kriteri</label>
+            <select name="gruplama" id="gruplama">
+                <option value="temsilci" <%= (filtreler.gruplama === 'temsilci') ? 'selected' : '' %>>Satış Temsilcisi</option>
+                <option value="musteri" <%= (filtreler.gruplama === 'musteri') ? 'selected' : '' %>>Müşteri</option>
+                <option value="kategori" <%= (filtreler.gruplama === 'kategori') ? 'selected' : '' %>>Kategori</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="zamanAraligi">Pratik Tarih Aralığı</label>
+            <select name="zamanAraligi" id="zamanAraligi">
+                <option value="manuel" <%= (!filtreler.zamanAraligi || filtreler.zamanAraligi === 'manuel') ? 'selected' : '' %>>Manuel Seçim</option>
+                <option value="bu_ay" <%= (filtreler.zamanAraligi === 'bu_ay') ? 'selected' : '' %>>Bu Ay</option>
+                <option value="gecen_ay" <%= (filtreler.zamanAraligi === 'gecen_ay') ? 'selected' : '' %>>Geçen Ay</option>
+                <option value="bu_yil" <%= (filtreler.zamanAraligi === 'bu_yil') ? 'selected' : '' %>>Bu Yıl</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="baslangicTarihi">Başlangıç Tarihi</label>
+            <input type="date" id="baslangicTarihi" name="baslangicTarihi" value="<%= filtreler.baslangicTarihi || '' %>">
+        </div>
+        <div class="form-group">
+            <label for="bitisTarihi">Bitiş Tarihi</label>
+            <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
+        </div>
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+            <a href="/karlilik-marji-analizi" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+
+    <% if (sonuclar && sonuclar.length > 0) { %>
+        <table>
+            <thead>
+                <tr>
+                    <th>
+                        <% if (filtreler.gruplama === 'temsilci') { %>Satış Temsilcisi<% } %>
+                        <% if (filtreler.gruplama === 'musteri') { %>Müşteri Adı<% } %>
+                        <% if (filtreler.gruplama === 'kategori') { %>Kategori<% } %>
+                    </th>
+                    <th>Toplam Ciro</th>
+                    <th>Toplam Kâr</th>
+                    <th>Ortalama Kâr Marjı</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% sonuclar.forEach(s => { %>
+                    <tr>
+                        <td><%= s[groupByColumn] %></td>
+                        <td class="sayisal"><%= s.ToplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                        <td class="sayisal"><%= s.ToplamKar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                        <td class="sayisal <%= s.KarMarji >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><%= s.KarMarji.toFixed(2) %>%</td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen bir filtreleme yaparak analize başlayın veya filtrelere uygun veri bulunamadı.</p>
+        </div>
+    <% } %>
+</main>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const zamanAraligiSelect = document.getElementById('zamanAraligi');
+        const baslangicInput = document.getElementById('baslangicTarihi');
+        const bitisInput = document.getElementById('bitisTarihi');
+
+        function updateDateInputsState() {
+            const isManual = zamanAraligiSelect.value === 'manuel';
+            baslangicInput.disabled = !isManual;
+            bitisInput.disabled = !isManual;
+        }
+
+        zamanAraligiSelect.addEventListener('change', function() {
+            if (this.value !== 'manuel') {
+                baslangicInput.value = '';
+                bitisInput.value = '';
+            }
+            updateDateInputsState();
+        });
+        
+        updateDateInputsState();
+    });
+</script>
+
+<%- include('partials/footer') %>

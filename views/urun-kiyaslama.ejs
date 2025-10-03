@@ -6,13 +6,18 @@
 
     <form action="/urun-kiyaslama" method="GET" class="filter-form">
         <div class="form-group">
+            <label for="metrik">Analiz Metriği</label>
+            <select name="metrik" id="metrik">
+                <option value="adet" <%= (filtreler.metrik === 'adet') ? 'selected' : '' %>>Adet</option>
+                <option value="litre" <%= (filtreler.metrik === 'litre') ? 'selected' : '' %>>Litre</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label for="tedarikci">Tedarikçi</label>
             <select name="tedarikci" id="tedarikci">
                 <option value="">Tümü</option>
                 <% if (tedarikciler) { tedarikciler.forEach(t => { %>
-                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>>
-                        <%= t.TEDARIKCI %>
-                    </option>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>><%= t.TEDARIKCI %></option>
                 <% }) } %>
             </select>
         </div>
@@ -21,20 +26,25 @@
             <select name="temsilci" id="temsilci">
                 <option value="">Tümü</option>
                 <% if (temsilciler) { temsilciler.forEach(t => { %>
-                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>>
-                        <%= t.SATISTEMSILCI %>
-                    </option>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>><%= t.SATISTEMSILCI %></option>
                 <% }) } %>
             </select>
         </div>
-        <div class="form-group" style="flex-grow: 2;">
-            <label for="urun">Analiz Edilecek Ürün</label>
-            <select name="urun" id="urun" required>
-                <option value="">Lütfen bir ürün seçin...</option>
-                <% if (urunler) { urunler.forEach(u => { %>
-                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>>
-                        <%= u.STOK_ADI %>
-                    </option>
+        <div class="form-group" style="flex-grow: 1.5;">
+            <label for="urun_grubu">Ürün Grubu</label>
+            <select name="urun_grubu" id="urun_grubu">
+                <option value="">Tümü</option>
+                <% if (urunGruplari) { urunGruplari.forEach(ug => { %>
+                    <option value="<%= ug.URUN_GRUBU %>" <%= (filtreler.urun_grubu === ug.URUN_GRUBU) ? 'selected' : '' %>><%= ug.URUN_GRUBU %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-group" style="flex-grow: 1.5;">
+            <label for="urun">Ürün</label>
+            <select name="urun" id="urun">
+                <option value="">Tümü</option>
+                 <% if (urunler) { urunler.forEach(u => { %>
+                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>><%= u.STOK_ADI %></option>
                 <% }) } %>
             </select>
         </div>
@@ -45,8 +55,9 @@
         </div>
     </form>
 
-    <% if (filtreler.urun && sonuclar.length > 0) { %>
+    <% if ((filtreler.urun_grubu || filtreler.urun) && sonuclar.length > 0) { %>
         <% 
+            const birim = filtreler.metrik === 'litre' ? 'L' : '';
             const toplam2024 = sonuclar.reduce((sum, s) => sum + s.miktar2024, 0);
             const toplam2025 = sonuclar.reduce((sum, s) => sum + s.miktar2025, 0);
             const toplamDegisim = toplam2025 - toplam2024;
@@ -60,42 +71,22 @@
         
         <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
             <div class="kpi-card">
-                <div class="icon" style="color: #95a5a6;"><i class="fa-solid fa-calendar-check"></i></div>
-                <div class="info">
-                    <h3>2024 Toplam Satış</h3>
-                    <div class="value"><%= toplam2024.toLocaleString('tr-TR') %></div>
-                </div>
+                <div class="info"><h3>2024 Toplam Satış (<%= birim || 'Adet' %>)</h3><div class="value"><%= toplam2024.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></div></div>
             </div>
             <div class="kpi-card">
-                <div class="icon"><i class="fa-solid fa-calendar-check"></i></div>
-                <div class="info">
-                    <h3>2025 Toplam Satış</h3>
-                    <div class="value"><%= toplam2025.toLocaleString('tr-TR') %></div>
-                </div>
+                <div class="info"><h3>2025 Toplam Satış (<%= birim || 'Adet' %>)</h3><div class="value"><%= toplam2025.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></div></div>
             </div>
             <div class="kpi-card">
-                <div class="icon <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><i class="fa-solid fa-arrow-trend-up"></i></div>
-                <div class="info">
-                    <h3>Yıllık Değişim</h3>
-                    <div class="value <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
-                        <% if(toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR') %>
-                    </div>
-                </div>
+                <div class="info"><h3>Yıllık Değişim</h3><div class="value <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if(toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></div></div>
             </div>
             <div class="kpi-card">
-                <div class="icon <%= yuzdeDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><i class="fa-solid fa-percent"></i></div>
-                <div class="info">
-                    <h3>Büyüme Oranı</h3>
-                    <div class="value <%= yuzdeDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
-                        <% if(yuzdeDegisim > 0) { %>+<% } %><%= yuzdeDegisim.toFixed(2) %>%
-                    </div>
-                </div>
+                <div class="info"><h3>Büyüme Oranı</h3><div class="value <%= yuzdeDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if(yuzdeDegisim > 0) { %>+<% } %><%= yuzdeDegisim.toFixed(2) %>%</div></div>
             </div>
         </div>
         
         <div class="result-container" style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
-            <div class="result-panel" style="background-color: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 1.5rem;">
-                <h2>Aylık Satış Miktarı Karşılaştırması</h2>
+            <div class="result-panel">
+                <h2>Aylık Satış Karşılaştırması - <%= filtreler.urun || filtreler.urun_grubu %> (<%= birim || 'Adet' %>)</h2>
                 <table>
                     <thead>
                         <tr>
@@ -114,44 +105,42 @@
                         %>
                         <tr>
                             <td><%= s.ay %></td>
-                            <td class="sayisal"><%= s.miktar2024.toLocaleString('tr-TR') %></td>
-                            <td class="sayisal"><%= s.miktar2025.toLocaleString('tr-TR') %></td>
-                            <td class="sayisal <%= degisimClass %>">
-                                <% if (degisim > 0) { %>+<% } %><%= degisim.toLocaleString('tr-TR') %>
-                            </td>
+                            <td class="sayisal"><%= s.miktar2024.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
+                            <td class="sayisal"><%= s.miktar2025.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
+                            <td class="sayisal <%= degisimClass %>"><% if (degisim > 0) { %>+<% } %><%= degisim.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
                         </tr>
                         <% }) %>
                     </tbody>
                     <tfoot>
-                        <tr style="background-color: var(--secondary-color); color: #fff; font-weight: bold;">
+                        <tr style="font-weight: bold;">
                             <td>TOPLAM</td>
-                            <td class="sayisal"><%= toplam2024.toLocaleString('tr-TR') %></td>
-                            <td class="sayisal"><%= toplam2025.toLocaleString('tr-TR') %></td>
-                            <td class="sayisal">
-                                 <% if (toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR') %>
-                            </td>
+                            <td class="sayisal"><%= toplam2024.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
+                            <td class="sayisal"><%= toplam2025.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
+                            <td class="sayisal <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if (toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
 
-            <div class="chart-container" style="background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <div class="chart-container" style="background-color: #fff; padding: 2rem; border-radius: 8px;">
                  <h2>Grafiksel Karşılaştırma</h2>
                 <canvas id="comparisonChart"></canvas>
             </div>
         </div>
     <% } else { %>
         <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
-            <p>Lütfen yukarıdaki menülerden filtreleme yaparak bir ürün seçin ve karşılaştırmaya başlayın.</p>
+            <p>Lütfen analiz için en az bir ürün grubu veya ürün seçin.</p>
         </div>
     <% } %>
 </main>
 
-<% if (filtreler.urun) { %>
+<% if ((filtreler.urun_grubu || filtreler.urun) && sonuclar.length > 0) { %>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const ctx = document.getElementById('comparisonChart').getContext('2d');
         const sonuclar = <%- JSON.stringify(sonuclar) %>;
+        const birim = '<%= filtreler.metrik === "litre" ? "Litre" : "Adet" %>';
+        const baslik = '<%= filtreler.urun || filtreler.urun_grubu %>';
 
         const labels = sonuclar.map(d => d.ay);
         const data2024 = sonuclar.map(d => d.miktar2024);
@@ -163,18 +152,14 @@
                 labels: labels,
                 datasets: [
                     {
-                        label: '2024 Satış Miktarı',
+                        label: `2024 Satış (${birim})`,
                         data: data2024,
                         backgroundColor: 'rgba(149, 165, 166, 0.8)', 
-                        borderColor: 'rgba(127, 140, 141, 1)',
-                        borderWidth: 1
                     },
                     {
-                        label: '2025 Satış Miktarı',
+                        label: `2025 Satış (${birim})`,
                         data: data2025,
                         backgroundColor: 'rgba(52, 152, 219, 0.8)',
-                        borderColor: 'rgba(41, 128, 185, 1)',
-                        borderWidth: 1
                     }
                 ]
             },
@@ -182,10 +167,13 @@
                 responsive: true,
                 plugins: {
                     legend: { position: 'top' },
-                    title: { display: true, text: '<%= filtreler.urun %> - Yıllık Satış Karşılaştırması' }
+                    title: { display: true, text: `${baslik} - Yıllık Satış Karşılaştırması` }
                 },
                 scales: {
-                    y: { beginAtZero: true }
+                    y: { 
+                        beginAtZero: true,
+                        title: { display: true, text: `Toplam Satış (${birim})` }
+                    }
                 }
             }
         });
@@ -197,31 +185,41 @@
     document.addEventListener('DOMContentLoaded', function() {
         const tedarikciSelect = document.getElementById('tedarikci');
         const temsilciSelect = document.getElementById('temsilci');
+        const urunGrubuSelect = document.getElementById('urun_grubu');
         const urunSelect = document.getElementById('urun');
+
+        const seciliUrunGrubu = urunGrubuSelect.value;
         const seciliUrun = urunSelect.value;
 
         async function guncelleUrunler() {
             const tedarikci = tedarikciSelect.value;
             const temsilci = temsilciSelect.value;
-            
+            const urunGrubu = urunGrubuSelect.value;
+
             urunSelect.disabled = true;
-            
+            urunSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+
             try {
-                const response = await fetch(`/api/urunler?tedarikci=${encodeURIComponent(tedarikci)}&temsilci=${encodeURIComponent(temsilci)}`);
-                if (!response.ok) {
-                    throw new Error('Sunucu hatası');
-                }
+                const response = await fetch(`/api/urunler?tedarikci=${encodeURIComponent(tedarikci)}&temsilci=${encodeURIComponent(temsilci)}&urun_grubu=${encodeURIComponent(urunGrubu)}`);
+                if (!response.ok) throw new Error('Sunucu hatası');
+                
                 const urunler = await response.json();
-                urunSelect.innerHTML = '<option value="">Lütfen bir ürün seçin...</option>';
+                urunSelect.innerHTML = '<option value="">Tümü</option>';
+                
+                let seciliUrunHalaListede = false;
                 urunler.forEach(u => {
                     const option = document.createElement('option');
                     option.value = u.STOK_ADI;
                     option.textContent = u.STOK_ADI;
                     if (u.STOK_ADI === seciliUrun) {
                         option.selected = true;
+                        seciliUrunHalaListede = true;
                     }
                     urunSelect.appendChild(option);
                 });
+                 if (!seciliUrunHalaListede) {
+                    urunSelect.value = "";
+                }
             } catch (error) {
                 console.error('Ürünler güncellenirken hata oluştu:', error);
                 urunSelect.innerHTML = '<option value="">Ürünler yüklenemedi!</option>';
@@ -230,8 +228,46 @@
             }
         }
 
-        tedarikciSelect.addEventListener('change', guncelleUrunler);
-        temsilciSelect.addEventListener('change', guncelleUrunler);
+        async function guncelleUrunGruplari() {
+            const tedarikci = tedarikciSelect.value;
+            const temsilci = temsilciSelect.value;
+            
+            urunGrubuSelect.disabled = true;
+            urunGrubuSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+            
+            try {
+                const response = await fetch(`/api/urun-gruplari?tedarikci=${encodeURIComponent(tedarikci)}&temsilci=${encodeURIComponent(temsilci)}`);
+                if (!response.ok) throw new Error('Sunucu hatası');
+
+                const urunGruplari = await response.json();
+                urunGrubuSelect.innerHTML = '<option value="">Tümü</option>';
+                
+                let seciliGrupHalaListede = false;
+                urunGruplari.forEach(ug => {
+                    const option = document.createElement('option');
+                    option.value = ug.URUN_GRUBU;
+                    option.textContent = ug.URUN_GRUBU;
+                    if (ug.URUN_GRUBU === seciliUrunGrubu) {
+                        option.selected = true;
+                        seciliGrupHalaListede = true;
+                    }
+                    urunGrubuSelect.appendChild(option);
+                });
+                if (!seciliGrupHalaListede) {
+                    urunGrubuSelect.value = "";
+                }
+            } catch (error) {
+                console.error('Ürün grupları güncellenirken hata oluştu:', error);
+                urunGrubuSelect.innerHTML = '<option value="">Gruplar yüklenemedi!</option>';
+            } finally {
+                urunGrubuSelect.disabled = false;
+                await guncelleUrunler();
+            }
+        }
+
+        tedarikciSelect.addEventListener('change', guncelleUrunGruplari);
+        temsilciSelect.addEventListener('change', guncelleUrunGruplari);
+        urunGrubuSelect.addEventListener('change', guncelleUrunler);
     });
 </script>
 

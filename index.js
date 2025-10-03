@@ -11,17 +11,16 @@ const dbConfig = {
     password: process.env.DB_PASSWORD,
     server: process.env.DB_SERVER,
     database: process.env.DB_DATABASE,
+    port: parseInt(process.env.DB_PORT, 10),
     options: {
         encrypt: false,
         trustServerCertificate: true
     },
-    requestTimeout: 60000 // 60 saniye (mililisaniye cinsinden)
+    requestTimeout: 60000 
 };
 
-// YENİ ve GELİŞMİŞ HESAPLAMA KATMANI: Önce işlem bazında, bulamazsa ürünün geneline bakarak maliyet bulur.
 const KARLILIK_HESAPLAMA_CTE = `
 WITH IslemBazindaMaliyet AS (
-    -- 1. Adım: Her bir işlem grubu (Tarih, Firma, Stok) için ortalama maliyeti hesapla.
     SELECT 
         TARIH,
         FIRMAADI,
@@ -34,7 +33,6 @@ WITH IslemBazindaMaliyet AS (
     GROUP BY TARIH, FIRMAADI, STOK_KODU
 ),
 GenelUrunMaliyeti AS (
-    -- 2. Adım: Her bir ürün için bilinen son (en yüksek) geçerli maliyeti bul (fallback için).
     SELECT
         STOK_KODU,
         MAX(COALESCE(MALIYET, ALISFIYATI, 0)) as GenelGecerliMaliyet
@@ -43,13 +41,12 @@ GenelUrunMaliyeti AS (
     GROUP BY STOK_KODU
 ),
 AnaVeri AS (
-    -- 3. Adım: Ana tabloyu bu iki yardımcı tablo ile birleştir ve nihai maliyeti belirle.
     SELECT
         s.*,
         COALESCE(
-            NULLIF(ibm.IslemOrtalamaMaliyeti, 0), -- Önce işlem bazındaki maliyeti kullanmayı dene
-            güm.GenelGecerliMaliyet,             -- Eğer işlemde maliyet yoksa, ürünün genel geçerli maliyetini kullan
-            0                                    -- O da yoksa son çare 0 kullan
+            NULLIF(ibm.IslemOrtalamaMaliyeti, 0),
+            güm.GenelGecerliMaliyet,
+            0
         ) AS DogruBirimMaliyet
     FROM 
         YC_SATIS_DETAY s
@@ -59,20 +56,16 @@ AnaVeri AS (
         GenelUrunMaliyeti güm ON s.STOK_KODU = güm.STOK_KODU
 )
 `;
-
-
 const BASE_WHERE_CLAUSE_SIMPLE = `
     YIL IN (2024, 2025) 
     AND STOK_ADI <> 'HİZMET' 
     AND TEDARIKCI <> 'GENEL HARCAMA'
 `;
-
 const BASE_WHERE_CLAUSE_PREFIXED = `
     s.YIL IN (2024, 2025) 
     AND s.STOK_ADI <> 'HİZMET' 
     AND s.TEDARIKCI <> 'GENEL HARCAMA'
 `;
-
 const GUNCEL_URUNLER_SUBQUERY = `
     (
         SELECT STOK_KODU, STOK_ADI FROM (
@@ -118,7 +111,6 @@ const poolPromise = new sql.ConnectionPool(dbConfig)
     })
     .catch(err => console.error('❌ Veritabanı bağlantı hatası:', err));
 
-// Merkezi Veri Çekme Fonksiyonu
 const getFilterData = async (options = []) => {
     const pool = await poolPromise;
     const data = {};
@@ -147,6 +139,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
+
 // === ANA SAYFA ===
 app.get('/', (req, res) => {
     res.render('index', { sayfaBasligi: 'Ana Sayfa', icerik: 'Rapor Uygulamasına Hoş Geldiniz!' });
@@ -157,7 +150,6 @@ app.get('/temsilci-performans', async (req, res) => {
     try {
         const pool = await poolPromise;
         const { yil, ay, temsilci, musteri, tedarikci } = req.query;
-
         const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
 
         let musteriQuery = `SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE_SIMPLE}`;
@@ -194,7 +186,7 @@ app.get('/temsilci-performans', async (req, res) => {
             sonuc: result.recordset[0], 
             filtreler: { yil, ay, temsilci, musteri, tedarikci } 
         });
-    } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
+    } catch (err) { console.error("Hata - Temsilci Performansı: ", err); res.status(500).send('Hata oluştu'); }
 });
 
 
@@ -202,7 +194,6 @@ app.get('/temsilci-performans', async (req, res) => {
 app.get('/urun-karlilik', async (req, res) => {
     try {
         const pool = await poolPromise;
-        
         const query = `
             ${KARLILIK_HESAPLAMA_CTE}
             SELECT 
@@ -222,13 +213,7 @@ app.get('/urun-karlilik', async (req, res) => {
         const result = await pool.request().query(query);
         const sonuclar = result.recordset;
 
-        let kpis = {
-            toplamCiro: 0,
-            toplamKar: 0,
-            ortalamaKarlilik: 0,
-            urunSayisi: 0
-        };
-
+        let kpis = { toplamCiro: 0, toplamKar: 0, ortalamaKarlilik: 0, urunSayisi: 0 };
         if (sonuclar.length > 0) {
             kpis.toplamCiro = sonuclar.reduce((sum, s) => sum + s.ToplamCiro, 0);
             kpis.toplamKar = sonuclar.reduce((sum, s) => sum + s.ToplamKar, 0);
@@ -243,11 +228,75 @@ app.get('/urun-karlilik', async (req, res) => {
             sonuclar: sonuclar, 
             kpis: kpis
         });
-    } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
+    } catch (err) { console.error("Hata - Ürün Karlılığı: ", err); res.status(500).send('Hata oluştu'); }
+});
+
+app.get('/karlilik-marji-analizi', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        let { gruplama, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
+
+        if (!gruplama) gruplama = 'temsilci';
+
+        if (zamanAraligi && zamanAraligi !== 'manuel') {
+            const range = getDateRange(zamanAraligi);
+            if (range) {
+                baslangicTarihi = range.startDate;
+                bitisTarihi = range.endDate;
+            }
+        }
+        
+        let groupByColumn = '';
+        switch(gruplama) {
+            case 'musteri':
+                groupByColumn = 'FIRMAADI';
+                break;
+            case 'kategori':
+                groupByColumn = 'KATEGORI';
+                break;
+            default:
+                groupByColumn = 'SATISTEMSILCI';
+        }
+
+        const request = pool.request();
+        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
+        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+
+        const marginQuery = `
+            ${KARLILIK_HESAPLAMA_CTE}
+            SELECT
+                ${groupByColumn},
+                SUM(TUTAR) as ToplamCiro,
+                SUM(TUTAR - (MIKTAR * DogruBirimMaliyet)) as ToplamKar,
+                CASE 
+                    WHEN SUM(TUTAR) = 0 THEN 0
+                    ELSE (SUM(TUTAR - (MIKTAR * DogruBirimMaliyet)) * 100.0) / SUM(TUTAR)
+                END as KarMarji
+            FROM AnaVeri
+            ${whereClauses}
+            GROUP BY ${groupByColumn}
+            HAVING ${groupByColumn} IS NOT NULL
+            ORDER BY KarMarji DESC;
+        `;
+
+        const result = await request.query(marginQuery);
+        
+        res.render('karlilik-marji-analizi', {
+            sayfaBasligi: 'Kârlılık Marjı Analizi',
+            sonuclar: result.recordset,
+            filtreler: { gruplama, baslangicTarihi, bitisTarihi, zamanAraligi },
+            groupByColumn: groupByColumn
+        });
+
+    } catch (err) {
+        console.error("Hata - Kârlılık Marjı Analizi: ", err);
+        res.status(500).send('Hata oluştu');
+    }
 });
 
 
-// === KARŞILAŞTIRMALI RAPORLARI ===
+// === KARŞILAŞTIRMALI RAPORLAR ===
 app.get('/temsilci-kiyaslama', async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -261,7 +310,6 @@ app.get('/temsilci-kiyaslama', async (req, res) => {
         }
         const { temsilciler, tedarikciler, kategoriler } = await getFilterData(['temsilciler', 'tedarikciler', 'kategoriler']);
 
-        let sonuc1 = null, sonuc2 = null;
         const getTemsilciData = async (temsilciAdi) => {
             if (!temsilciAdi) return null;
             let query = `
@@ -284,55 +332,66 @@ app.get('/temsilci-kiyaslama', async (req, res) => {
             const result = await request.query(query);
             return result.recordset[0];
         };
-        sonuc1 = await getTemsilciData(temsilci1);
-        sonuc2 = await getTemsilciData(temsilci2);
+        const [sonuc1, sonuc2] = await Promise.all([getTemsilciData(temsilci1), getTemsilciData(temsilci2)]);
+
         res.render('temsilci-kiyaslama', { 
             sayfaBasligi: 'Temsilci Kıyaslama Paneli', 
             temsilciler, tedarikciler, kategoriler,
             sonuc1, sonuc2, 
             filtreler: { temsilci1, temsilci2, baslangicTarihi, bitisTarihi, tedarikci, kategori, zamanAraligi } 
         });
-    } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
+    } catch (err) { console.error("Hata - Temsilci Kıyaslama: ", err); res.status(500).send('Hata oluştu'); }
 });
 
 app.get('/urun-kiyaslama', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { urun, temsilci, tedarikci } = req.query;
+        const { urun_grubu, urun, temsilci, tedarikci, metrik = 'adet' } = req.query;
 
         const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
+        
+        let urunGruplariQuery = `SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY WHERE URUN_GRUBU IS NOT NULL`;
+        const urunGruplariRequest = pool.request();
+        if (temsilci) { urunGruplariQuery += ` AND SATISTEMSILCI = @temsilciParam`; urunGruplariRequest.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (tedarikci) { urunGruplariQuery += ` AND TEDARIKCI = @tedarikciParam`; urunGruplariRequest.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        urunGruplariQuery += ` ORDER BY URUN_GRUBU`;
+        const urunGruplari = (await urunGruplariRequest.query(urunGruplariQuery)).recordset;
 
-        let urunlerQuery = `
-            SELECT DISTINCT gu.STOK_ADI 
-            FROM YC_SATIS_DETAY s
-            JOIN ${GUNCEL_URUNLER_SUBQUERY} gu ON s.STOK_KODU = gu.STOK_KODU
-            WHERE ${BASE_WHERE_CLAUSE_PREFIXED}
-        `;
-        const request = pool.request();
-        if (temsilci) { urunlerQuery += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
-        if (tedarikci) { urunlerQuery += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
-        urunlerQuery += ` ORDER BY gu.STOK_ADI`;
-        const urunler = (await request.query(urunlerQuery)).recordset;
+        let urunlerQuery = `SELECT DISTINCT STOK_ADI FROM YC_SATIS_DETAY WHERE STOK_ADI IS NOT NULL`;
+        const urunlerRequest = pool.request();
+        if (temsilci) { urunlerQuery += ` AND SATISTEMSILCI = @temsilciParam`; urunlerRequest.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (tedarikci) { urunlerQuery += ` AND TEDARIKCI = @tedarikciParam`; urunlerRequest.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        if (urun_grubu) { urunlerQuery += ` AND URUN_GRUBU = @urunGrubuParam`; urunlerRequest.input('urunGrubuParam', sql.NVarChar, urun_grubu); }
+        urunlerQuery += ` ORDER BY STOK_ADI`;
+        const urunler = (await urunlerRequest.query(urunlerQuery)).recordset;
         
         let sonuclar = [];
-        if (urun) {
-            const request2 = pool.request();
-            let query2 = `
+        if (urun_grubu || urun) {
+            const aggregationColumn = metrik === 'litre' ? 's.SATIS_MIKTAR_LITRE' : 's.MIKTAR';
+
+            const request = pool.request();
+            let query = `
                 SELECT
                     s.AY,
-                    SUM(CASE WHEN s.YIL = 2024 THEN s.MIKTAR ELSE 0 END) as Miktar2024,
-                    SUM(CASE WHEN s.YIL = 2025 THEN s.MIKTAR ELSE 0 END) as Miktar2025
+                    SUM(CASE WHEN s.YIL = 2024 THEN ${aggregationColumn} ELSE 0 END) as miktar2024,
+                    SUM(CASE WHEN s.YIL = 2025 THEN ${aggregationColumn} ELSE 0 END) as miktar2025
                 FROM YC_SATIS_DETAY s
-                WHERE ${BASE_WHERE_CLAUSE_PREFIXED} AND s.STOK_KODU IN (
-                    SELECT STOK_KODU FROM ${GUNCEL_URUNLER_SUBQUERY} AS gu WHERE gu.STOK_ADI = @urunParam
-                )
+                WHERE ${BASE_WHERE_CLAUSE_PREFIXED} 
             `;
-            request2.input('urunParam', sql.NVarChar, urun);
-            if (temsilci) { query2 += ` AND s.SATISTEMSILCI = @temsilciParam`; request2.input('temsilciParam', sql.NVarChar, temsilci); }
-            if (tedarikci) { query2 += ` AND s.TEDARIKCI = @tedarikciParam`; request2.input('tedarikciParam', sql.NVarChar, tedarikci); }
-            query2 += ` GROUP BY s.AY ORDER BY s.AY`;
             
-            const result = await request2.query(query2);
+            if (urun) {
+                query += ` AND s.STOK_ADI = @urunParam`;
+                request.input('urunParam', sql.NVarChar, urun);
+            } else if (urun_grubu) {
+                query += ` AND s.URUN_GRUBU = @urunGrubuParam`;
+                request.input('urunGrubuParam', sql.NVarChar, urun_grubu);
+            }
+            
+            if (temsilci) { query += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+            if (tedarikci) { query += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+            query += ` GROUP BY s.AY ORDER BY s.AY`;
+            
+            const result = await request.query(query);
             
             const resultData = result.recordset;
             const ayIsimleri = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
@@ -340,19 +399,22 @@ app.get('/urun-kiyaslama', async (req, res) => {
                 const monthData = resultData.find(r => r.AY === i);
                 sonuclar.push({
                     ay: ayIsimleri[i - 1],
-                    miktar2024: monthData ? monthData.Miktar2024 : 0,
-                    miktar2025: monthData ? monthData.Miktar2025 : 0,
+                    miktar2024: monthData ? monthData.miktar2024 : 0,
+                    miktar2025: monthData ? monthData.miktar2025 : 0,
                 });
             }
         }
         res.render('urun-kiyaslama', {
-            sayfaBasligi: 'Yıllık Ürün Kıyaslama',
-            urunler, temsilciler, tedarikciler,
+            sayfaBasligi: 'Yıllık Kıyaslama Raporu',
+            urunGruplari,
+            urunler,
+            temsilciler, 
+            tedarikciler,
             sonuclar,
-            filtreler: { urun, temsilci, tedarikci }
+            filtreler: { urun_grubu, urun, temsilci, tedarikci, metrik } 
         });
     } catch (err) {
-        console.error(err);
+        console.error("Hata - Ürün Kıyaslama: ", err);
         res.status(500).send('Hata oluştu');
     }
 });
@@ -372,7 +434,7 @@ app.get('/aylik-trend', async (req, res) => {
             GROUP BY YIL, AY ORDER BY YIL, AY
         `);
         res.render('aylik-trend', { sayfaBasligi: 'Aylık Ciro ve Kârlılık Trendi', sonuclar: result.recordset });
-    } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
+    } catch (err) { console.error("Hata - Aylık Trend: ", err); res.status(500).send('Hata oluştu'); }
 });
 
 // === STRATEJİK RAPORLAR ===
@@ -422,7 +484,7 @@ app.get('/urun-potansiyeli', async (req, res) => {
             sonuclar,
             filtreler: { musteri, temsilci, tedarikci, kategori }
         });
-    } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
+    } catch (err) { console.error("Hata - Ürün Potansiyeli: ", err); res.status(500).send('Hata oluştu'); }
 });
 
 app.get('/musteri-potansiyeli', async (req, res) => {
@@ -466,7 +528,7 @@ app.get('/musteri-potansiyeli', async (req, res) => {
             sonuclar,
             filtreler: { urun, temsilci }
         });
-    } catch (err) { console.error(err); res.status(500).send('Hata oluştu'); }
+    } catch (err) { console.error("Hata - Müşteri Potansiyeli: ", err); res.status(500).send('Hata oluştu'); }
 });
 
 app.get('/musteri-kayip-urun', async (req, res) => {
@@ -546,14 +608,14 @@ app.get('/musteri-kayip-urun', async (req, res) => {
     }
 });
 
-// =================================================================
-// GÜNCELLENEN RAPOR: MÜŞTERİ DEĞER ANALİZİ (YENİ FİLTRE VE SÜTUN İLE)
-// =================================================================
 app.get('/musteri-deger-analizi', async (req, res) => {
-    try {
+     try {
         const pool = await poolPromise;
         let { temsilci, tedarikci, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
 
+        const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
+
+        if (!zamanAraligi) zamanAraligi = 'bu_yil';
         if (zamanAraligi && zamanAraligi !== 'manuel') {
             const range = getDateRange(zamanAraligi);
             if (range) {
@@ -562,13 +624,10 @@ app.get('/musteri-deger-analizi', async (req, res) => {
             }
         }
         
-        const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
-
-        let sonuclar = [];
         let kpis = { toplamCiro: 0, sayiA: 0, sayiB: 0, sayiC: 0 };
         
-        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
         const request = pool.request();
+        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
         if (temsilci) { whereClauses += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
         if (tedarikci) { whereClauses += ` AND TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
         if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
@@ -613,7 +672,7 @@ app.get('/musteri-deger-analizi', async (req, res) => {
         `;
 
         const result = await request.query(abcQuery);
-        sonuclar = result.recordset;
+        const sonuclar = result.recordset;
 
         if (sonuclar.length > 0) {
             kpis.toplamCiro = sonuclar.reduce((sum, s) => sum + s.ToplamCiro, 0);
@@ -712,79 +771,12 @@ app.get('/kayip-musteri-analizi', async (req, res) => {
     }
 });
 
-app.get('/karlilik-marji-analizi', async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        let { gruplama, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
-
-        // Varsayılan gruplama kriteri
-        if (!gruplama) gruplama = 'temsilci';
-
-        if (zamanAraligi && zamanAraligi !== 'manuel') {
-            const range = getDateRange(zamanAraligi);
-            if (range) {
-                baslangicTarihi = range.startDate;
-                bitisTarihi = range.endDate;
-            }
-        }
-        
-        // Dinamik sorgu için sütun adlarını belirle
-        let groupByColumn = '';
-        switch(gruplama) {
-            case 'musteri':
-                groupByColumn = 'FIRMAADI';
-                break;
-            case 'kategori':
-                groupByColumn = 'KATEGORI';
-                break;
-            default:
-                groupByColumn = 'SATISTEMSILCI';
-        }
-
-        const request = pool.request();
-        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
-        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
-        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
-
-        const marginQuery = `
-            ${KARLILIK_HESAPLAMA_CTE}
-            SELECT
-                ${groupByColumn},
-                SUM(TUTAR) as ToplamCiro,
-                SUM(TUTAR - (MIKTAR * DogruBirimMaliyet)) as ToplamKar,
-                CASE 
-                    WHEN SUM(TUTAR) = 0 THEN 0
-                    ELSE (SUM(TUTAR - (MIKTAR * DogruBirimMaliyet)) * 100.0) / SUM(TUTAR)
-                END as KarMarji
-            FROM AnaVeri
-            ${whereClauses}
-            GROUP BY ${groupByColumn}
-            HAVING ${groupByColumn} IS NOT NULL
-            ORDER BY KarMarji DESC;
-        `;
-
-        const result = await request.query(marginQuery);
-        
-        res.render('karlilik-marji-analizi', {
-            sayfaBasligi: 'Kârlılık Marjı Analizi',
-            sonuclar: result.recordset,
-            filtreler: { gruplama, baslangicTarihi, bitisTarihi, zamanAraligi },
-            groupByColumn: groupByColumn // Bu, EJS'de doğru sütunu yazdırmak için
-        });
-
-    } catch (err) {
-        console.error("Hata - Kârlılık Marjı Analizi: ", err);
-        res.status(500).send('Hata oluştu');
-    }
-});
-
 app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
     try {
         const pool = await poolPromise;
 
         const scorecardQuery = `
             ${KARLILIK_HESAPLAMA_CTE},
-            -- 1. 2025 Ciro ve Kar Marjı
             TemsilciCiroKar2025 AS (
                 SELECT
                     SATISTEMSILCI,
@@ -797,7 +789,6 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
                 WHERE YIL = 2025 AND SATISTEMSILCI IS NOT NULL
                 GROUP BY SATISTEMSILCI
             ),
-            -- 2. Müşteri Tutma Oranı
             TemsilciMusterileri2024 AS (
                 SELECT SATISTEMSILCI, FIRMAADI FROM YC_SATIS_DETAY WHERE YIL = 2024 AND SATISTEMSILCI IS NOT NULL GROUP BY SATISTEMSILCI, FIRMAADI
             ),
@@ -812,7 +803,6 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
                 LEFT JOIN TemsilciMusterileri2025 t25 ON t24.SATISTEMSILCI = t25.SATISTEMSILCI AND t24.FIRMAADI = t25.FIRMAADI
                 GROUP BY t24.SATISTEMSILCI
             ),
-            -- 3. Yeni Müşteri Kazanımı
             YeniMusteriler AS (
                 SELECT SATISTEMSILCI, COUNT(*) as YeniMusteriSayisi FROM (
                     SELECT SATISTEMSILCI, FIRMAADI FROM TemsilciMusterileri2025
@@ -821,7 +811,6 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
                 ) AS T
                 GROUP BY SATISTEMSILCI
             ),
-            -- 4. A Sınıfı Müşteri Sayısı
             MusteriCiro2025 AS (
                 SELECT FIRMAADI, SUM(TUTAR) as ToplamCiro
                 FROM YC_SATIS_DETAY WHERE YIL = 2025 GROUP BY FIRMAADI
@@ -842,7 +831,6 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
                 WHERE s.YIL = 2025 AND ms.Sinif = 'A' AND s.SATISTEMSILCI IS NOT NULL
                 GROUP BY s.SATISTEMSILCI
             )
-            -- Final Sonuçları Birleştirme
             SELECT 
                 t.SATISTEMSILCI,
                 ISNULL(ck.ToplamCiro, 0) as ToplamCiro,
@@ -867,182 +855,6 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
 
     } catch (err) {
         console.error("Hata - Temsilci Etkinlik Karnesi: ", err);
-        res.status(500).send('Hata oluştu');
-    }
-});
-
-// Fikir 1: Fiyat Esnekliği Analizi
-app.get('/fiyat-esnekligi', async (req, res) => {
-    try {
-        const { urun } = req.query;
-        const { urunler } = await getFilterData(['urunler']);
-
-        let sonuclar = [];
-        if (urun) {
-            // DÜZELTME: Eksik olan 'pool' değişkeni eklendi.
-            const pool = await poolPromise;
-            const request = pool.request();
-            request.input('urunParam', sql.NVarChar, urun);
-            const query = `
-                SELECT
-                    YIL,
-                    AY,
-                    AVG(TUTAR / NULLIF(MIKTAR, 0)) as OrtalamaBirimFiyat,
-                    SUM(MIKTAR) as ToplamMiktar
-                FROM YC_SATIS_DETAY
-                WHERE STOK_ADI = @urunParam AND MIKTAR > 0 AND TUTAR > 0
-                GROUP BY YIL, AY
-                ORDER BY YIL, AY;
-            `;
-            const result = await request.query(query);
-            sonuclar = result.recordset;
-        }
-
-        res.render('fiyat-esnekligi', {
-            sayfaBasligi: 'Fiyat Esnekliği Analizi',
-            urunler,
-            sonuclar,
-            filtreler: { urun }
-        });
-    } catch (err) {
-        console.error("Hata - Fiyat Esnekliği: ", err);
-        res.status(500).send('Hata oluştu');
-    }
-});
-
-// Fikir 2: Müşteri Bağımlılığı Riski
-app.get('/musteri-bagimliligi', async (req, res) => {
-     try {
-        const pool = await poolPromise;
-        let { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
-
-        const { temsilciler } = await getFilterData(['temsilciler']);
-
-        if (!zamanAraligi) zamanAraligi = 'bu_yil';
-        if (zamanAraligi && zamanAraligi !== 'manuel') {
-            const range = getDateRange(zamanAraligi);
-            if (range) {
-                baslangicTarihi = range.startDate;
-                bitisTarihi = range.endDate;
-            }
-        }
-
-        const request = pool.request();
-        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
-        
-        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
-        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
-        if (temsilci) { whereClauses += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
-
-        const query = `
-            WITH MusteriCiro AS (
-                SELECT
-                    FIRMAADI,
-                    SUM(TUTAR) as ToplamCiro,
-                    ROW_NUMBER() OVER (ORDER BY SUM(TUTAR) DESC) as Sira
-                FROM YC_SATIS_DETAY
-                ${whereClauses}
-                GROUP BY FIRMAADI
-            )
-            SELECT 
-                FIRMAADI,
-                ToplamCiro,
-                Sira
-            FROM MusteriCiro 
-            WHERE Sira <= 10
-            ORDER BY Sira;
-        `;
-        const top10Result = await request.query(query);
-        const genelToplamResult = await request.query(`SELECT SUM(TUTAR) as GenelToplamCiro FROM YC_SATIS_DETAY ${whereClauses}`);
-        
-        const sonuclar = top10Result.recordset;
-        const toplamCiro = genelToplamResult.recordset[0].GenelToplamCiro || 0;
-
-        let kpis = { toplamCiro: toplamCiro, top1Payi: 0, top5Payi: 0, top10Payi: 0 };
-        if (toplamCiro > 0 && sonuclar.length > 0) {
-            let top1Ciro = 0, top5Ciro = 0, top10Ciro = 0;
-            sonuclar.forEach(s => {
-                // DÜZELTME: 'Sira' değeri 'parseInt' ile sayıya çevrilerek karşılaştırılıyor.
-                if(parseInt(s.Sira) === 1) top1Ciro += s.ToplamCiro;
-                if(parseInt(s.Sira) <= 5) top5Ciro += s.ToplamCiro;
-                if(parseInt(s.Sira) <= 10) top10Ciro += s.ToplamCiro;
-            });
-            kpis.top1Payi = (top1Ciro / toplamCiro) * 100;
-            kpis.top5Payi = (top5Ciro / toplamCiro) * 100;
-            kpis.top10Payi = (top10Ciro / toplamCiro) * 100;
-        }
-
-        res.render('musteri-bagimliligi', {
-            sayfaBasligi: 'Müşteri Bağımlılığı Riski',
-            sonuclar,
-            kpis,
-            temsilciler,
-            filtreler: { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi }
-        });
-
-    } catch (err) {
-        console.error("Hata - Müşteri Bağımlılığı: ", err);
-        res.status(500).send('Hata oluştu');
-    }
-});
-
-
-// Fikir 3: Ürün Kanibalizasyon Analizi
-app.get('/urun-kanibalizasyon', async (req, res) => {
-    try {
-        const { eski_urun, yeni_urun } = req.query;
-        const { urunler } = await getFilterData(['urunler']);
-
-        let chartData = null;
-        if (eski_urun && yeni_urun) {
-            const pool = await poolPromise;
-            const request = pool.request();
-            request.input('eskiUrun', sql.NVarChar, eski_urun);
-            request.input('yeniUrun', sql.NVarChar, yeni_urun);
-
-            const lansmanResult = await pool.request().input('yeniUrun', sql.NVarChar, yeni_urun).query('SELECT MIN(TARIH) as LansmanTarihi FROM YC_SATIS_DETAY WHERE STOK_ADI = @yeniUrun');
-            const lansmanTarihi = lansmanResult.recordset[0].LansmanTarihi;
-            
-            const salesQuery = `
-                SELECT STOK_ADI, YIL, AY, SUM(MIKTAR) as ToplamMiktar
-                FROM YC_SATIS_DETAY
-                WHERE STOK_ADI IN (@eskiUrun, @yeniUrun)
-                GROUP BY STOK_ADI, YIL, AY
-                ORDER BY YIL, AY;
-            `;
-            const salesResult = await request.query(salesQuery);
-
-            if (salesResult.recordset.length > 0) {
-                const labels = [];
-                const eskiUrunData = [];
-                const yeniUrunData = [];
-                const salesMap = new Map();
-                salesResult.recordset.forEach(r => {
-                    const key = `${r.YIL}-${String(r.AY).padStart(2, '0')}`;
-                    if(!salesMap.has(key)) salesMap.set(key, {});
-                    salesMap.get(key)[r.STOK_ADI] = r.ToplamMiktar;
-                });
-
-                for (let y = 2024; y <= 2025; y++) {
-                    for (let m = 1; m <= 12; m++) {
-                        const key = `${y}-${String(m).padStart(2, '0')}`;
-                        labels.push(`${key}-01`); // For time scale
-                        eskiUrunData.push(salesMap.get(key)?.[eski_urun] || 0);
-                        yeniUrunData.push(salesMap.get(key)?.[yeni_urun] || 0);
-                    }
-                }
-                chartData = { labels, eskiUrunData, yeniUrunData, lansmanTarihi };
-            }
-        }
-        
-        res.render('urun-kanibalizasyon', {
-            sayfaBasligi: 'Ürün Kanibalizasyon Analizi',
-            urunler,
-            chartData,
-            filtreler: { eski_urun, yeni_urun }
-        });
-    } catch (err) {
-        console.error("Hata - Ürün Kanibalizasyon: ", err);
         res.status(500).send('Hata oluştu');
     }
 });
@@ -1129,50 +941,198 @@ app.get('/musteri-siparis-riski', async (req, res) => {
     }
 });
 
-// === API ROTALARI ===
-app.get('/api/musteriler-by-temsilci', async (req, res) => {
+app.get('/fiyat-esnekligi', async (req, res) => {
     try {
-        const pool = await poolPromise;
-        const { temsilci } = req.query;
+        const { urun } = req.query;
+        const { urunler } = await getFilterData(['urunler']);
 
-        let musteriQuery = `SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE_SIMPLE}`;
-        const request = pool.request();
-        if (temsilci) {
-             musteriQuery += ` AND SATISTEMSILCI = @temsilciParam`;
-             request.input('temsilciParam', sql.NVarChar, temsilci);
+        let sonuclar = [];
+        if (urun) {
+            const pool = await poolPromise;
+            const request = pool.request();
+            request.input('urunParam', sql.NVarChar, urun);
+            const query = `
+                SELECT
+                    YIL,
+                    AY,
+                    AVG(TUTAR / NULLIF(MIKTAR, 0)) as OrtalamaBirimFiyat,
+                    SUM(MIKTAR) as ToplamMiktar
+                FROM YC_SATIS_DETAY
+                WHERE STOK_ADI = @urunParam AND MIKTAR > 0 AND TUTAR > 0
+                GROUP BY YIL, AY
+                ORDER BY YIL, AY;
+            `;
+            const result = await request.query(query);
+            sonuclar = result.recordset;
         }
-        musteriQuery += ` ORDER BY FIRMAADI`;
-        
-        const musteriler = (await request.query(musteriQuery)).recordset;
-        res.json(musteriler);
 
+        res.render('fiyat-esnekligi', {
+            sayfaBasligi: 'Fiyat Esnekliği Analizi',
+            urunler,
+            sonuclar,
+            filtreler: { urun }
+        });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Müşteriler getirilemedi' });
+        console.error("Hata - Fiyat Esnekliği: ", err);
+        res.status(500).send('Hata oluştu');
     }
 });
 
+app.get('/musteri-bagimliligi', async (req, res) => {
+     try {
+        const pool = await poolPromise;
+        let { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi } = req.query;
+
+        const { temsilciler } = await getFilterData(['temsilciler']);
+
+        if (!zamanAraligi) zamanAraligi = 'bu_yil';
+        if (zamanAraligi && zamanAraligi !== 'manuel') {
+            const range = getDateRange(zamanAraligi);
+            if (range) {
+                baslangicTarihi = range.startDate;
+                bitisTarihi = range.endDate;
+            }
+        }
+
+        const request = pool.request();
+        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')} AND TUTAR > 0`;
+        
+        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+        if (temsilci) { whereClauses += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+
+        const query = `
+            WITH MusteriCiro AS (
+                SELECT
+                    FIRMAADI,
+                    SUM(TUTAR) as ToplamCiro,
+                    ROW_NUMBER() OVER (ORDER BY SUM(TUTAR) DESC) as Sira
+                FROM YC_SATIS_DETAY
+                ${whereClauses}
+                GROUP BY FIRMAADI
+            )
+            SELECT 
+                FIRMAADI,
+                ToplamCiro,
+                Sira
+            FROM MusteriCiro 
+            WHERE Sira <= 10
+            ORDER BY Sira;
+        `;
+        const top10Result = await request.query(query);
+        const genelToplamResult = await request.query(`SELECT SUM(TUTAR) as GenelToplamCiro FROM YC_SATIS_DETAY ${whereClauses}`);
+        
+        const sonuclar = top10Result.recordset;
+        const toplamCiro = genelToplamResult.recordset[0].GenelToplamCiro || 0;
+
+        let kpis = { toplamCiro: toplamCiro, top1Payi: 0, top5Payi: 0, top10Payi: 0 };
+        if (toplamCiro > 0 && sonuclar.length > 0) {
+            let top1Ciro = 0, top5Ciro = 0, top10Ciro = 0;
+            sonuclar.forEach(s => {
+                if(parseInt(s.Sira) === 1) top1Ciro += s.ToplamCiro;
+                if(parseInt(s.Sira) <= 5) top5Ciro += s.ToplamCiro;
+                if(parseInt(s.Sira) <= 10) top10Ciro += s.ToplamCiro;
+            });
+            kpis.top1Payi = (top1Ciro / toplamCiro) * 100;
+            kpis.top5Payi = (top5Ciro / toplamCiro) * 100;
+            kpis.top10Payi = (top10Ciro / toplamCiro) * 100;
+        }
+
+        res.render('musteri-bagimliligi', {
+            sayfaBasligi: 'Müşteri Bağımlılığı Riski',
+            sonuclar,
+            kpis,
+            temsilciler,
+            filtreler: { temsilci, baslangicTarihi, bitisTarihi, zamanAraligi }
+        });
+
+    } catch (err) {
+        console.error("Hata - Müşteri Bağımlılığı: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+app.get('/urun-kanibalizasyon', async (req, res) => {
+    try {
+        const { eski_urun, yeni_urun } = req.query;
+        const { urunler } = await getFilterData(['urunler']);
+
+        let chartData = null;
+        if (eski_urun && yeni_urun) {
+            const pool = await poolPromise;
+            const request = pool.request();
+            request.input('eskiUrun', sql.NVarChar, eski_urun);
+            request.input('yeniUrun', sql.NVarChar, yeni_urun);
+
+            const lansmanResult = await pool.request().input('yeniUrun', sql.NVarChar, yeni_urun).query('SELECT MIN(TARIH) as LansmanTarihi FROM YC_SATIS_DETAY WHERE STOK_ADI = @yeniUrun');
+            const lansmanTarihi = lansmanResult.recordset[0].LansmanTarihi;
+            
+            const salesQuery = `
+                SELECT STOK_ADI, YIL, AY, SUM(MIKTAR) as ToplamMiktar
+                FROM YC_SATIS_DETAY
+                WHERE STOK_ADI IN (@eskiUrun, @yeniUrun)
+                GROUP BY STOK_ADI, YIL, AY
+                ORDER BY YIL, AY;
+            `;
+            const salesResult = await request.query(salesQuery);
+
+            if (salesResult.recordset.length > 0) {
+                const labels = [];
+                const eskiUrunData = [];
+                const yeniUrunData = [];
+                const salesMap = new Map();
+                salesResult.recordset.forEach(r => {
+                    const key = `${r.YIL}-${String(r.AY).padStart(2, '0')}`;
+                    if(!salesMap.has(key)) salesMap.set(key, {});
+                    salesMap.get(key)[r.STOK_ADI] = r.ToplamMiktar;
+                });
+
+                for (let y = 2024; y <= 2025; y++) {
+                    for (let m = 1; m <= 12; m++) {
+                        const key = `${y}-${String(m).padStart(2, '0')}`;
+                        labels.push(`${key}-01`);
+                        eskiUrunData.push(salesMap.get(key)?.[eski_urun] || 0);
+                        yeniUrunData.push(salesMap.get(key)?.[yeni_urun] || 0);
+                    }
+                }
+                chartData = { labels, eskiUrunData, yeniUrunData, lansmanTarihi };
+            }
+        }
+        
+        res.render('urun-kanibalizasyon', {
+            sayfaBasligi: 'Ürün Kanibalizasyon Analizi',
+            urunler,
+            chartData,
+            filtreler: { eski_urun, yeni_urun }
+        });
+    } catch (err) {
+        console.error("Hata - Ürün Kanibalizasyon: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+
+// === API ROTALARI ===
 app.get('/api/urunler', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { temsilci, tedarikci } = req.query;
-
-        let urunlerQuery = `
+        const { temsilci, tedarikci, urun_grubu } = req.query;
+        let query = `
             SELECT DISTINCT gu.STOK_ADI 
             FROM YC_SATIS_DETAY s
             JOIN ${GUNCEL_URUNLER_SUBQUERY} gu ON s.STOK_KODU = gu.STOK_KODU
             WHERE ${BASE_WHERE_CLAUSE_PREFIXED}
         `;
         const request = pool.request();
-        if (temsilci) { urunlerQuery += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
-        if (tedarikci) { urunlerQuery += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        if (temsilci) { query += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (tedarikci) { query += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        if (urun_grubu) { query += ` AND s.URUN_GRUBU = @urunGrubuParam`; request.input('urunGrubuParam', sql.NVarChar, urun_grubu); }
         
-        urunlerQuery += ` ORDER BY gu.STOK_ADI`;
-        const urunler = (await request.query(urunlerQuery)).recordset;
-        res.json(urunler);
-
+        query += ` ORDER BY gu.STOK_ADI`;
+        const result = (await request.query(query)).recordset;
+        res.json(result);
     } catch (err) {
-        console.error(err);
+        console.error("Hata - API/urunler: ", err);
         res.status(500).json({ error: 'Ürünler getirilemedi' });
     }
 });
@@ -1182,19 +1142,58 @@ app.get('/api/musteriler', async (req, res) => {
         const pool = await poolPromise;
         const { yil, ay, temsilci } = req.query;
 
-        let musteriQuery = `SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE_SIMPLE}`;
+        let query = `SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE_SIMPLE}`;
         const request = pool.request();
-        if (yil) { musteriQuery += ` AND YIL = @yilParam`; request.input('yilParam', sql.Int, yil); }
-        if (ay) { musteriQuery += ` AND AY = @ayParam`; request.input('ayParam', sql.Int, ay); }
-        if (temsilci) { musteriQuery += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
-        musteriQuery += ` ORDER BY FIRMAADI`;
+        if (yil) { query += ` AND YIL = @yilParam`; request.input('yilParam', sql.Int, yil); }
+        if (ay) { query += ` AND AY = @ayParam`; request.input('ayParam', sql.Int, ay); }
+        if (temsilci) { query += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+        query += ` ORDER BY FIRMAADI`;
         
-        const musteriler = (await request.query(musteriQuery)).recordset;
-        res.json(musteriler);
-
+        const result = (await request.query(query)).recordset;
+        res.json(result);
     } catch (err) {
-        console.error(err);
+        console.error("Hata - API/musteriler: ", err);
         res.status(500).json({ error: 'Müşteriler getirilemedi' });
+    }
+});
+
+app.get('/api/musteriler-by-temsilci', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { temsilci } = req.query;
+
+        let query = `SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY WHERE ${BASE_WHERE_CLAUSE_SIMPLE}`;
+        const request = pool.request();
+        if (temsilci) {
+             query += ` AND SATISTEMSILCI = @temsilciParam`;
+             request.input('temsilciParam', sql.NVarChar, temsilci);
+        }
+        query += ` ORDER BY FIRMAADI`;
+        
+        const result = (await request.query(query)).recordset;
+        res.json(result);
+    } catch (err) {
+        console.error("Hata - API/musteriler-by-temsilci: ", err);
+        res.status(500).json({ error: 'Müşteriler getirilemedi' });
+    }
+});
+
+app.get('/api/urun-gruplari', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { temsilci, tedarikci } = req.query;
+
+        let query = `SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY WHERE URUN_GRUBU IS NOT NULL`;
+        const request = pool.request();
+        if (temsilci) { query += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (tedarikci) { query += ` AND TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        
+        query += ` ORDER BY URUN_GRUBU`;
+        const result = (await request.query(query)).recordset;
+        res.json(result);
+    } catch (err) {
+        console.error("Hata - API/urun-gruplari: ", err);
+        res.status(500).json({ error: 'Ürün grupları getirilemedi' });
     }
 });
 

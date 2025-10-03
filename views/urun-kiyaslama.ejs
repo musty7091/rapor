@@ -10,6 +10,15 @@
             <select name="metrik" id="metrik">
                 <option value="adet" <%= (filtreler.metrik === 'adet') ? 'selected' : '' %>>Adet</option>
                 <option value="litre" <%= (filtreler.metrik === 'litre') ? 'selected' : '' %>>Litre</option>
+                <option value="tutar" <%= (filtreler.metrik === 'tutar') ? 'selected' : '' %>>Tutar</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="fis_turu">Satış Tipi</label>
+            <select name="fis_turu" id="fis_turu">
+                <option value="">Tümü</option>
+                <option value="toptan" <%= (filtreler.fis_turu === 'toptan') ? 'selected' : '' %>>Toptan Satış</option>
+                <option value="market" <%= (filtreler.fis_turu === 'market') ? 'selected' : '' %>>Market Satış</option>
             </select>
         </div>
         <div class="form-group">
@@ -57,7 +66,18 @@
 
     <% if ((filtreler.urun_grubu || filtreler.urun) && sonuclar.length > 0) { %>
         <% 
-            const birim = filtreler.metrik === 'litre' ? 'L' : '';
+            let birimText = 'Adet';
+            if (filtreler.metrik === 'litre') birimText = 'Litre';
+            if (filtreler.metrik === 'tutar') birimText = 'TL';
+
+            const formatNumber = (num) => {
+                if (filtreler.metrik === 'tutar') {
+                    return num.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
+                }
+                const birimSuffix = filtreler.metrik === 'litre' ? ' L' : '';
+                return num.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) + birimSuffix;
+            };
+
             const toplam2024 = sonuclar.reduce((sum, s) => sum + s.miktar2024, 0);
             const toplam2025 = sonuclar.reduce((sum, s) => sum + s.miktar2025, 0);
             const toplamDegisim = toplam2025 - toplam2024;
@@ -70,23 +90,15 @@
         %>
         
         <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-            <div class="kpi-card">
-                <div class="info"><h3>2024 Toplam Satış (<%= birim || 'Adet' %>)</h3><div class="value"><%= toplam2024.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></div></div>
-            </div>
-            <div class="kpi-card">
-                <div class="info"><h3>2025 Toplam Satış (<%= birim || 'Adet' %>)</h3><div class="value"><%= toplam2025.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></div></div>
-            </div>
-            <div class="kpi-card">
-                <div class="info"><h3>Yıllık Değişim</h3><div class="value <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if(toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></div></div>
-            </div>
-            <div class="kpi-card">
-                <div class="info"><h3>Büyüme Oranı</h3><div class="value <%= yuzdeDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if(yuzdeDegisim > 0) { %>+<% } %><%= yuzdeDegisim.toFixed(2) %>%</div></div>
-            </div>
+            <div class="kpi-card"><div class="info"><h3>2024 Toplam Satış (<%= birimText %>)</h3><div class="value"><%= formatNumber(toplam2024) %></div></div></div>
+            <div class="kpi-card"><div class="info"><h3>2025 Toplam Satış (<%= birimText %>)</h3><div class="value"><%= formatNumber(toplam2025) %></div></div></div>
+            <div class="kpi-card"><div class="info"><h3>Yıllık Değişim</h3><div class="value <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if(toplamDegisim > 0) { %>+<% } %><%= formatNumber(toplamDegisim) %></div></div></div>
+            <div class="kpi-card"><div class="info"><h3>Büyüme Oranı</h3><div class="value <%= yuzdeDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if(yuzdeDegisim > 0) { %>+<% } %><%= yuzdeDegisim.toFixed(2) %>%</div></div></div>
         </div>
         
         <div class="result-container" style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
             <div class="result-panel">
-                <h2>Aylık Satış Karşılaştırması - <%= filtreler.urun || filtreler.urun_grubu %> (<%= birim || 'Adet' %>)</h2>
+                <h2>Aylık Satış Karşılaştırması - <%= filtreler.urun || filtreler.urun_grubu %> (<%= birimText %>)</h2>
                 <table>
                     <thead>
                         <tr>
@@ -105,18 +117,18 @@
                         %>
                         <tr>
                             <td><%= s.ay %></td>
-                            <td class="sayisal"><%= s.miktar2024.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
-                            <td class="sayisal"><%= s.miktar2025.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
-                            <td class="sayisal <%= degisimClass %>"><% if (degisim > 0) { %>+<% } %><%= degisim.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
+                            <td class="sayisal"><%= formatNumber(s.miktar2024) %></td>
+                            <td class="sayisal"><%= formatNumber(s.miktar2025) %></td>
+                            <td class="sayisal <%= degisimClass %>"><% if (degisim > 0) { %>+<% } %><%= formatNumber(degisim) %></td>
                         </tr>
                         <% }) %>
                     </tbody>
                     <tfoot>
                         <tr style="font-weight: bold;">
                             <td>TOPLAM</td>
-                            <td class="sayisal"><%= toplam2024.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
-                            <td class="sayisal"><%= toplam2025.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
-                            <td class="sayisal <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if (toplamDegisim > 0) { %>+<% } %><%= toplamDegisim.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> <%= birim %></td>
+                            <td class="sayisal"><%= formatNumber(toplam2024) %></td>
+                            <td class="sayisal"><%= formatNumber(toplam2025) %></td>
+                            <td class="sayisal <%= toplamDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>"><% if (toplamDegisim > 0) { %>+<% } %><%= formatNumber(toplamDegisim) %></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -139,7 +151,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         const ctx = document.getElementById('comparisonChart').getContext('2d');
         const sonuclar = <%- JSON.stringify(sonuclar) %>;
-        const birim = '<%= filtreler.metrik === "litre" ? "Litre" : "Adet" %>';
+        const birim = '<%= filtreler.metrik === "litre" ? "Litre" : (filtreler.metrik === "tutar" ? "TL" : "Adet") %>';
         const baslik = '<%= filtreler.urun || filtreler.urun_grubu %>';
 
         const labels = sonuclar.map(d => d.ay);

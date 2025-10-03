@@ -1,0 +1,51 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<style>
+    .raw-data-container {
+        overflow-x: auto; /* Yatay kaydırma çubuğu ekler */
+        background-color: #fff;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    .raw-data-container table {
+        white-space: nowrap; /* Hücrelerin aşağı kaymasını engeller */
+    }
+</style>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-database"></i> Ham Veri Görüntüleyici</h1>
+    <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
+        <code>YC_SATIS_DETAY_TUMU</code> tablosundaki ilk 10 satırı ve tüm sütunları listeler.
+    </p>
+
+    <% if (sutunlar && sutunlar.length > 0) { %>
+        <div class="raw-data-container">
+            <table>
+                <thead>
+                    <tr>
+                        <% sutunlar.forEach(sutun => { %>
+                            <th><%= sutun %></th>
+                        <% }) %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% veriler.forEach(satir => { %>
+                        <tr>
+                            <% sutunlar.forEach(sutun => { %>
+                                <td><%= satir[sutun] %></td>
+                            <% }) %>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Tablodan veri çekilemedi veya tablo boş.</p>
+        </div>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>

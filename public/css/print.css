@@ -1,0 +1,56 @@
+/* Bu CSS dosyası SADECE sayfa yazdırılırken veya PDF'e kaydedilirken devreye girer. */
+
+@media print {
+    body {
+        background-color: #fff !important;
+        color: #000 !important;
+        font-size: 10pt; /* Yazıcı için punto boyutu */
+    }
+
+    /* Görünmemesi gereken elementleri gizle */
+    .sidebar,
+    .filter-form,
+    .print-button {
+        display: none !important;
+    }
+
+    /* Ana içerik alanını tüm sayfayı kaplayacak şekilde genişlet */
+    .main-content {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .app-container {
+        display: block !important; /* Flex yapısını boz */
+    }
+
+    /* Kart ve tabloların gölgelerini, arka plan renklerini kaldır */
+    .scorecard,
+    .kpi-card,
+    .result-panel,
+    table,
+    .info-box {
+        box-shadow: none !important;
+        border: 1px solid #ccc;
+        background-color: #fff !important;
+    }
+    
+    /* Sayfa sonlarını daha mantıklı yerlere koymaya çalış */
+    .scorecard, .result-panel {
+        page-break-inside: avoid;
+    }
+
+    /* Linklerin rengini siyah yap */
+    a {
+        color: #000 !important;
+        text-decoration: none;
+    }
+
+    /* Rapor başlığını daha belirgin yap */
+    .main-content h1 {
+        font-size: 18pt;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+    }
+}

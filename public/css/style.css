@@ -309,3 +309,31 @@ td.sayisal {
     justify-content: flex-end;
     gap: 1rem;
 }
+/* PDF Butonu Stili */
+.print-button {
+    background-color: #c0392b;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto; /* Başlığın sağına yaslar */
+}
+
+.print-button:hover {
+    background-color: #a93226;
+}
+
+/* Rapor başlığını butonla aynı hizaya getirmek için */
+.main-content h1 {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}

@@ -1,0 +1,109 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1><i class="fa-solid fa-arrow-up-right-dots"></i> <%= sayfaBasligi %></h1>
+
+    <form method="GET" class="filter-form">
+        <div class="form-group">
+            <label for="baslangicTarihi">Başlangıç Tarihi</label>
+            <input type="date" id="baslangicTarihi" name="baslangicTarihi" value="<%= filtreler.baslangicTarihi || '' %>">
+        </div>
+        <div class="form-group">
+            <label for="bitisTarihi">Bitiş Tarihi</label>
+            <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
+        </div>
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>><%= t.TEDARIKCI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <%# DEĞİŞİKLİK: Kategori filtresi Ürün Grubu olarak güncellendi %>
+        <div class="form-group">
+            <label for="urun_grubu">Ürün Grubu</label>
+            <select name="urun_grubu" id="urun_grubu">
+                <option value="">Tümü</option>
+                <% if (urunGruplari) { urunGruplari.forEach(ug => { %>
+                    <option value="<%= ug.URUN_GRUBU %>" <%= (filtreler.urun_grubu === ug.URUN_GRUBU) ? 'selected' : '' %>><%= ug.URUN_GRUBU %></option>
+                <% }) } %>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+        </div>
+    </form>
+
+    <% if (sonuclar && sonuclar.length > 0) { %>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sıra</th>
+                    <th>Ürün Adı</th>
+                    <th>Toplam Net Tutar</th>
+                    <th>Toplam Net Adet</th>
+                    <th>Toplam Net Litre</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% sonuclar.forEach((s, index) => { %>
+                    <tr>
+                        <td><%= index + 1 %></td>
+                        <td><%= s.STOK_ADI %></td>
+                        <td class="sayisal"><%= s.ToplamTutar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                        <td class="sayisal"><%= s.ToplamAdet.toLocaleString('tr-TR') %></td>
+                        <td class="sayisal"><%= s.ToplamLitre.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> L</td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen bir filtreleme yaparak analize başlayın veya filtrelere uygun veri bulunamadı.</p>
+        </div>
+    <% } %>
+</main>
+
+<%# DEĞİŞİKLİK: Javascript, Ürün Gruplarını dinamik olarak güncelliyor %>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tedarikciSelect = document.getElementById('tedarikci');
+        const urunGrubuSelect = document.getElementById('urun_grubu');
+        const seciliUrunGrubu = '<%= filtreler.urun_grubu || "" %>';
+
+        async function guncelleUrunGruplari() {
+            const tedarikci = tedarikciSelect.value;
+            urunGrubuSelect.disabled = true;
+            urunGrubuSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+            try {
+                const response = await fetch(`/api/urun-gruplari-by-tedarikci?tedarikci=${encodeURIComponent(tedarikci)}`);
+                if (!response.ok) throw new Error('Sunucu hatası');
+                
+                const urunGruplari = await response.json();
+                urunGrubuSelect.innerHTML = '<option value="">Tümü</option>';
+                
+                urunGruplari.forEach(ug => {
+                    const option = document.createElement('option');
+                    option.value = ug.URUN_GRUBU;
+                    option.textContent = ug.URUN_GRUBU;
+                    if (ug.URUN_GRUBU === seciliUrunGrubu) {
+                        option.selected = true;
+                    }
+                    urunGrubuSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Ürün Grupları güncellenirken hata oluştu:', error);
+                urunGrubuSelect.innerHTML = '<option value="">Gruplar yüklenemedi!</option>';
+            } finally {
+                urunGrubuSelect.disabled = false;
+            }
+        }
+
+        tedarikciSelect.addEventListener('change', guncelleUrunGruplari);
+    });
+</script>
+
+<%- include('partials/footer') %>

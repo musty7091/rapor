@@ -198,6 +198,88 @@ app.get('/temsilci-performans', async (req, res) => {
     } catch (err) { console.error("Hata - Temsilci Performansı: ", err); res.status(500).send('Hata oluştu'); }
 });
 
+const getTopNProducts = async (n, filtreler) => {
+    const pool = await poolPromise;
+    const { tedarikci, urun_grubu, baslangicTarihi, bitisTarihi } = filtreler;
+
+    const request = pool.request();
+    let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_PREFIXED}`;
+    if (tedarikci) { whereClauses += ' AND s.TEDARIKCI = @tedarikciParam'; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+    if (urun_grubu) { whereClauses += ' AND s.URUN_GRUBU = @urunGrubuParam'; request.input('urunGrubuParam', sql.NVarChar, urun_grubu); }
+    if (baslangicTarihi) { whereClauses += ' AND s.TARIH >= @baslangicParam'; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+    if (bitisTarihi) { whereClauses += ' AND s.TARIH <= @bitisParam'; request.input('bitisParam', sql.Date, bitisTarihi); }
+    
+    // DÜZELTME: SUM ifadeleri ISNULL ile sarılarak null dönmesi engellendi.
+    const query = `
+        SELECT TOP ${n}
+            s.STOK_ADI,
+            ISNULL(SUM(${NET_TUTAR}), 0) as ToplamTutar,
+            ISNULL(SUM(${NET_MIKTAR}), 0) as ToplamAdet,
+            ISNULL(SUM(${NET_LITRE}), 0) as ToplamLitre
+        FROM YC_SATIS_DETAY_TUMU s
+        ${whereClauses}
+        GROUP BY s.STOK_ADI
+        ORDER BY ToplamTutar DESC;
+    `;
+    const result = await request.query(query);
+    return result.recordset;
+};
+
+app.get('/top-5-satis', async (req, res) => {
+    try {
+        const { tedarikciler } = await getFilterData(['tedarikciler']);
+        const sonuclar = await getTopNProducts(5, req.query);
+        
+        const pool = await poolPromise;
+        let urunGruplariQuery = 'SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY_TUMU WHERE URUN_GRUBU IS NOT NULL';
+        const ugRequest = pool.request();
+        if (req.query.tedarikci) {
+            urunGruplariQuery += ' AND TEDARIKCI = @tedarikciParam';
+            ugRequest.input('tedarikciParam', sql.NVarChar, req.query.tedarikci);
+        }
+        urunGruplariQuery += ' ORDER BY URUN_GRUBU';
+        const urunGruplari = (await ugRequest.query(urunGruplariQuery)).recordset;
+
+        res.render('top-satis', {
+            sayfaBasligi: 'Top 5 Satış Analizi',
+            sonuclar,
+            tedarikciler,
+            urunGruplari,
+            filtreler: req.query
+        });
+    } catch(err) {
+        console.error("Hata - Top 5 Satış: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
+app.get('/top-10-satis', async (req, res) => {
+    try {
+        const { tedarikciler } = await getFilterData(['tedarikciler']);
+        const sonuclar = await getTopNProducts(10, req.query);
+        
+        const pool = await poolPromise;
+        let urunGruplariQuery = 'SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY_TUMU WHERE URUN_GRUBU IS NOT NULL';
+        const ugRequest = pool.request();
+        if (req.query.tedarikci) {
+            urunGruplariQuery += ' AND TEDARIKCI = @tedarikciParam';
+            ugRequest.input('tedarikciParam', sql.NVarChar, req.query.tedarikci);
+        }
+        urunGruplariQuery += ' ORDER BY URUN_GRUBU';
+        const urunGruplari = (await ugRequest.query(urunGruplariQuery)).recordset;
+
+        res.render('top-satis', {
+            sayfaBasligi: 'Top 10 Satış Analizi',
+            sonuclar,
+            tedarikciler,
+            urunGruplari,
+            filtreler: req.query
+        });
+    } catch(err) {
+        console.error("Hata - Top 10 Satış: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
 
 // === KARLILIK RAPORLARI ===
 app.get('/urun-karlilik', async (req, res) => {
@@ -297,7 +379,6 @@ app.get('/karlilik-marji-analizi', async (req, res) => {
         res.status(500).send('Hata oluştu');
     }
 });
-
 
 // === KARŞILAŞTIRMALI RAPORLAR ===
 app.get('/temsilci-kiyaslama', async (req, res) => {
@@ -437,6 +518,29 @@ app.get('/urun-kiyaslama', async (req, res) => {
     }
 });
 
+// === GELİŞTİRİCİ ARAÇLARI ===
+app.get('/ham-veri', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const query = `SELECT TOP 10 * FROM YC_SATIS_DETAY_TUMU`;
+        const result = await pool.request().query(query);
+
+        let sutunlar = [];
+        if (result.recordset.length > 0) {
+            sutunlar = Object.keys(result.recordset[0]);
+        }
+
+        res.render('ham-veri', {
+            sayfaBasligi: 'Ham Veri',
+            sutunlar: sutunlar,
+            veriler: result.recordset
+        });
+
+    } catch (err) {
+        console.error("Hata - Ham Veri Görüntüleyici: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
 
 // === DÖNEM RAPORLARI ===
 app.get('/aylik-trend', async (req, res) => {
@@ -1131,6 +1235,27 @@ app.get('/urun-kanibalizasyon', async (req, res) => {
 
 
 // === API ROTALARI ===
+app.get('/api/urun-gruplari-by-tedarikci', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { tedarikci } = req.query;
+
+        let query = `SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY_TUMU WHERE URUN_GRUBU IS NOT NULL`;
+        const request = pool.request();
+        if (tedarikci) {
+             query += ` AND TEDARIKCI = @tedarikciParam`;
+             request.input('tedarikciParam', sql.NVarChar, tedarikci);
+        }
+        query += ` ORDER BY URUN_GRUBU`;
+        
+        const result = (await request.query(query)).recordset;
+        res.json(result);
+    } catch (err) {
+        console.error("Hata - API/urun-gruplari-by-tedarikci: ", err);
+        res.status(500).json({ error: 'Ürün Grupları getirilemedi' });
+    }
+});
+
 app.get('/api/urunler', async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -1152,6 +1277,27 @@ app.get('/api/urunler', async (req, res) => {
     } catch (err) {
         console.error("Hata - API/urunler: ", err);
         res.status(500).json({ error: 'Ürünler getirilemedi' });
+    }
+});
+
+app.get('/api/kategoriler-by-tedarikci', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { tedarikci } = req.query;
+
+        let query = `SELECT DISTINCT KATEGORI FROM YC_SATIS_DETAY_TUMU WHERE KATEGORI IS NOT NULL`;
+        const request = pool.request();
+        if (tedarikci) {
+             query += ` AND TEDARIKCI = @tedarikciParam`;
+             request.input('tedarikciParam', sql.NVarChar, tedarikci);
+        }
+        query += ` ORDER BY KATEGORI`;
+        
+        const result = (await request.query(query)).recordset;
+        res.json(result);
+    } catch (err) {
+        console.error("Hata - API/kategoriler-by-tedarikci: ", err);
+        res.status(500).json({ error: 'Kategoriler getirilemedi' });
     }
 });
 

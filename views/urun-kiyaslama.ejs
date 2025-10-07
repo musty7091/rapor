@@ -1,8 +1,31 @@
 <%- include('partials/header') %>
 <%- include('partials/sidebar') %>
 
+<style>
+    @media print {
+        @page {
+            size: A4 portrait; /* Dikey Sayfa */
+        }
+    }
+</style>
+
 <main class="main-content">
-    <h1><i class="fa-solid fa-chart-simple"></i> <%= sayfaBasligi %></h1>
+    <h1>
+        <i class="fa-solid fa-chart-simple"></i> <%= sayfaBasligi %>
+        <button onclick="window.print()" class="print-button">
+            <i class="fa-solid fa-file-pdf"></i> PDF Olarak Kaydet
+        </button>
+    </h1>
+
+    <div class="print-summary">
+        <h4>Filtre Özeti</h4>
+        <% if (filtreler.metrik) { %><p><strong>Analiz Metriği:</strong> <%= filtreler.metrik.charAt(0).toUpperCase() + filtreler.metrik.slice(1) %></p><% } %>
+        <% if (filtreler.fis_turu) { %><p><strong>Satış Tipi:</strong> <%= filtreler.fis_turu === 'toptan' ? 'Toptan Satış' : 'Market Satış' %></p><% } %>
+        <% if (filtreler.tedarikci) { %><p><strong>Tedarikçi:</strong> <%= filtreler.tedarikci %></p><% } %>
+        <% if (filtreler.temsilci) { %><p><strong>Temsilci:</strong> <%= filtreler.temsilci %></p><% } %>
+        <% if (filtreler.urun_grubu) { %><p><strong>Ürün Grubu:</strong> <%= filtreler.urun_grubu %></p><% } %>
+        <% if (filtreler.urun) { %><p><strong>Ürün:</strong> <%= filtreler.urun %></p><% } %>
+    </div>
 
     <form action="/urun-kiyaslama" method="GET" class="filter-form">
         <div class="form-group">

@@ -1,8 +1,31 @@
 <%- include('partials/header') %>
 <%- include('partials/sidebar') %>
 
+<style>
+    @media print {
+        @page {
+            size: A4 landscape; /* Yatay Sayfa */
+        }
+    }
+</style>
+
 <main class="main-content">
-    <h1><i class="fa-solid fa-arrow-up-right-dots"></i> <%= sayfaBasligi %></h1>
+    <h1>
+        <i class="fa-solid fa-arrow-up-right-dots"></i> <%= sayfaBasligi %>
+        <button onclick="window.print()" class="print-button">
+            <i class="fa-solid fa-file-pdf"></i> PDF Olarak Kaydet
+        </button>
+    </h1>
+
+    <div class="print-summary">
+        <h4>Filtre Özeti</h4>
+        <% if (filtreler.baslangicTarihi && filtreler.bitisTarihi) { %>
+            <p><strong>Tarih Aralığı:</strong> <%= new Date(filtreler.baslangicTarihi).toLocaleDateString('tr-TR') %> - <%= new Date(filtreler.bitisTarihi).toLocaleDateString('tr-TR') %></p>
+        <% } %>
+        <% if (filtreler.fis_turu) { %><p><strong>Satış Tipi:</strong> <%= filtreler.fis_turu === 'toptan' ? 'Toptan Satış' : 'Market Satış' %></p><% } %>
+        <% if (filtreler.tedarikci) { %><p><strong>Tedarikçi:</strong> <%= filtreler.tedarikci %></p><% } %>
+        <% if (filtreler.urun_grubu) { %><p><strong>Ürün Grubu:</strong> <%= filtreler.urun_grubu %></p><% } %>
+    </div>
 
     <form method="GET" class="filter-form">
         <div class="form-group">
@@ -14,6 +37,14 @@
             <input type="date" id="bitisTarihi" name="bitisTarihi" value="<%= filtreler.bitisTarihi || '' %>">
         </div>
         <div class="form-group">
+            <label for="fis_turu">Satış Tipi</label>
+            <select name="fis_turu" id="fis_turu">
+                <option value="">Tümü</option>
+                <option value="toptan" <%= (filtreler.fis_turu === 'toptan') ? 'selected' : '' %>>Toptan Satış</option>
+                <option value="market" <%= (filtreler.fis_turu === 'market') ? 'selected' : '' %>>Market Satış</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label for="tedarikci">Tedarikçi</label>
             <select name="tedarikci" id="tedarikci">
                 <option value="">Tümü</option>
@@ -22,7 +53,6 @@
                 <% }) } %>
             </select>
         </div>
-        <%# DEĞİŞİKLİK: Kategori filtresi Ürün Grubu olarak güncellendi %>
         <div class="form-group">
             <label for="urun_grubu">Ürün Grubu</label>
             <select name="urun_grubu" id="urun_grubu">
@@ -38,6 +68,33 @@
     </form>
 
     <% if (sonuclar && sonuclar.length > 0) { %>
+        <% 
+            const ozetToplamTutar = sonuclar.reduce((sum, s) => sum + s.ToplamTutar, 0);
+            const ozetToplamAdet = sonuclar.reduce((sum, s) => sum + s.ToplamAdet, 0);
+            const ozetToplamLitre = sonuclar.reduce((sum, s) => sum + s.ToplamLitre, 0);
+        %>
+
+        <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="kpi-card">
+                <div class="info">
+                    <h3>Listelenen Ürünlerin Toplam Cirosu</h3>
+                    <div class="value"><%= ozetToplamTutar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="info">
+                    <h3>Toplam Adet</h3>
+                    <div class="value"><%= ozetToplamAdet.toLocaleString('tr-TR') %></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="info">
+                    <h3>Toplam Litre</h3>
+                    <div class="value"><%= ozetToplamLitre.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> L</div>
+                </div>
+            </div>
+        </div>
+
         <table>
             <thead>
                 <tr>
@@ -67,33 +124,39 @@
     <% } %>
 </main>
 
-<%# DEĞİŞİKLİK: Javascript, Ürün Gruplarını dinamik olarak güncelliyor %>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const fisTuruSelect = document.getElementById('fis_turu');
         const tedarikciSelect = document.getElementById('tedarikci');
         const urunGrubuSelect = document.getElementById('urun_grubu');
         const seciliUrunGrubu = '<%= filtreler.urun_grubu || "" %>';
 
         async function guncelleUrunGruplari() {
             const tedarikci = tedarikciSelect.value;
+            const fisTuru = fisTuruSelect.value;
             urunGrubuSelect.disabled = true;
             urunGrubuSelect.innerHTML = '<option value="">Yükleniyor...</option>';
             try {
-                const response = await fetch(`/api/urun-gruplari-by-tedarikci?tedarikci=${encodeURIComponent(tedarikci)}`);
+                const response = await fetch(`/api/urun-gruplari-by-tedarikci?tedarikci=${encodeURIComponent(tedarikci)}&fis_turu=${encodeURIComponent(fisTuru)}`);
                 if (!response.ok) throw new Error('Sunucu hatası');
                 
                 const urunGruplari = await response.json();
                 urunGrubuSelect.innerHTML = '<option value="">Tümü</option>';
                 
+                let seciliGrupHalaListede = false;
                 urunGruplari.forEach(ug => {
                     const option = document.createElement('option');
                     option.value = ug.URUN_GRUBU;
                     option.textContent = ug.URUN_GRUBU;
                     if (ug.URUN_GRUBU === seciliUrunGrubu) {
                         option.selected = true;
+                        seciliGrupHalaListede = true;
                     }
                     urunGrubuSelect.appendChild(option);
                 });
+                if(!seciliGrupHalaListede) {
+                    urunGrubuSelect.value = "";
+                }
             } catch (error) {
                 console.error('Ürün Grupları güncellenirken hata oluştu:', error);
                 urunGrubuSelect.innerHTML = '<option value="">Gruplar yüklenemedi!</option>';
@@ -103,6 +166,7 @@
         }
 
         tedarikciSelect.addEventListener('change', guncelleUrunGruplari);
+        fisTuruSelect.addEventListener('change', guncelleUrunGruplari);
     });
 </script>
 

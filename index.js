@@ -200,7 +200,7 @@ app.get('/temsilci-performans', async (req, res) => {
 
 const getTopNProducts = async (n, filtreler) => {
     const pool = await poolPromise;
-    const { tedarikci, urun_grubu, baslangicTarihi, bitisTarihi } = filtreler;
+    const { tedarikci, urun_grubu, baslangicTarihi, bitisTarihi, fis_turu } = filtreler;
 
     const request = pool.request();
     let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_PREFIXED}`;
@@ -209,7 +209,12 @@ const getTopNProducts = async (n, filtreler) => {
     if (baslangicTarihi) { whereClauses += ' AND s.TARIH >= @baslangicParam'; request.input('baslangicParam', sql.Date, baslangicTarihi); }
     if (bitisTarihi) { whereClauses += ' AND s.TARIH <= @bitisParam'; request.input('bitisParam', sql.Date, bitisTarihi); }
     
-    // DÜZELTME: SUM ifadeleri ISNULL ile sarılarak null dönmesi engellendi.
+    if (fis_turu === 'toptan') {
+        whereClauses += ` AND s.FIS_TURU IN (21, 23)`;
+    } else if (fis_turu === 'market') {
+        whereClauses += ` AND s.FIS_TURU IN (101, 102)`;
+    }
+    
     const query = `
         SELECT TOP ${n}
             s.STOK_ADI,
@@ -236,6 +241,11 @@ app.get('/top-5-satis', async (req, res) => {
         if (req.query.tedarikci) {
             urunGruplariQuery += ' AND TEDARIKCI = @tedarikciParam';
             ugRequest.input('tedarikciParam', sql.NVarChar, req.query.tedarikci);
+        }
+        if (req.query.fis_turu === 'toptan') {
+            urunGruplariQuery += ` AND FIS_TURU IN (21, 23)`;
+        } else if (req.query.fis_turu === 'market') {
+            urunGruplariQuery += ` AND FIS_TURU IN (101, 102)`;
         }
         urunGruplariQuery += ' ORDER BY URUN_GRUBU';
         const urunGruplari = (await ugRequest.query(urunGruplariQuery)).recordset;
@@ -264,6 +274,11 @@ app.get('/top-10-satis', async (req, res) => {
         if (req.query.tedarikci) {
             urunGruplariQuery += ' AND TEDARIKCI = @tedarikciParam';
             ugRequest.input('tedarikciParam', sql.NVarChar, req.query.tedarikci);
+        }
+        if (req.query.fis_turu === 'toptan') {
+            urunGruplariQuery += ` AND FIS_TURU IN (21, 23)`;
+        } else if (req.query.fis_turu === 'market') {
+            urunGruplariQuery += ` AND FIS_TURU IN (101, 102)`;
         }
         urunGruplariQuery += ' ORDER BY URUN_GRUBU';
         const urunGruplari = (await ugRequest.query(urunGruplariQuery)).recordset;
@@ -1238,13 +1253,18 @@ app.get('/urun-kanibalizasyon', async (req, res) => {
 app.get('/api/urun-gruplari-by-tedarikci', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { tedarikci } = req.query;
+        const { tedarikci, fis_turu } = req.query;
 
         let query = `SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY_TUMU WHERE URUN_GRUBU IS NOT NULL`;
         const request = pool.request();
         if (tedarikci) {
              query += ` AND TEDARIKCI = @tedarikciParam`;
              request.input('tedarikciParam', sql.NVarChar, tedarikci);
+        }
+        if (fis_turu === 'toptan') {
+            query += ` AND FIS_TURU IN (21, 23)`;
+        } else if (fis_turu === 'market') {
+            query += ` AND FIS_TURU IN (101, 102)`;
         }
         query += ` ORDER BY URUN_GRUBU`;
         

@@ -1,20 +1,38 @@
 /* Bu CSS dosyası SADECE sayfa yazdırılırken veya PDF'e kaydedilirken devreye girer. */
 
+/* @page kuralı buradan kaldırıldı. Artık her rapor kendi .ejs dosyasında yönünü belirleyecek. */
+
+/* Normal ekranda özet kutusunu gizle */
+.print-summary {
+    display: none;
+}
+
 @media print {
     body {
         background-color: #fff !important;
         color: #000 !important;
-        font-size: 10pt; /* Yazıcı için punto boyutu */
+        font-size: 8.5pt; 
     }
 
-    /* Görünmemesi gereken elementleri gizle */
     .sidebar,
     .filter-form,
-    .print-button {
+    .print-button,
+    .chart-container {
         display: none !important;
     }
 
-    /* Ana içerik alanını tüm sayfayı kaplayacak şekilde genişlet */
+    .print-summary {
+        display: block;
+        border: 1px solid #ccc;
+        padding: 8px 12px;
+        margin-bottom: 15px;
+        page-break-inside: avoid;
+    }
+
+    .print-summary p {
+        margin: 0 0 4px 0;
+    }
+
     .main-content {
         width: 100% !important;
         padding: 0 !important;
@@ -22,10 +40,9 @@
     }
     
     .app-container {
-        display: block !important; /* Flex yapısını boz */
+        display: block !important;
     }
 
-    /* Kart ve tabloların gölgelerini, arka plan renklerini kaldır */
     .scorecard,
     .kpi-card,
     .result-panel,
@@ -36,21 +53,36 @@
         background-color: #fff !important;
     }
     
-    /* Sayfa sonlarını daha mantıklı yerlere koymaya çalış */
+    .kpi-container {
+        grid-template-columns: repeat(2, 1fr) !important;
+        margin-bottom: 15px !important;
+        page-break-inside: avoid;
+    }
+    
+    .kpi-card .info h3 {
+        font-size: 0.8rem;
+    }
+     .kpi-card .info .value {
+        font-size: 1.5rem;
+    }
+
     .scorecard, .result-panel {
         page-break-inside: avoid;
     }
 
-    /* Linklerin rengini siyah yap */
     a {
         color: #000 !important;
         text-decoration: none;
     }
 
-    /* Rapor başlığını daha belirgin yap */
     .main-content h1 {
-        font-size: 18pt;
-        border-bottom: 2px solid #000;
-        padding-bottom: 10px;
+        font-size: 15pt;
+        border-bottom: 1px solid #000;
+        padding-bottom: 5px;
+        margin-bottom: 10px;
+    }
+
+    th, td {
+        padding: 4px 6px;
     }
 }

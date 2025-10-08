@@ -1,0 +1,7 @@
+[
+  { "tarih": "2024-01-15", "urun_grubu": "RAKI", "kanal": "MARKET", "satis_litre": 120.5 },
+  { "tarih": "2024-07-03", "urun_grubu": "RAKI", "kanal": "MARKET", "satis_litre": 310.0 },
+  { "tarih": "2024-12-20", "urun_grubu": "RAKI", "kanal": "ONLINE", "satis_litre": 85.7 },
+  { "tarih": "2023-05-10", "urun_grubu": "RAKI", "kanal": "MARKET", "satis_litre": 50.0 },
+  { "tarih": "2024-03-02", "urun_grubu": "VOTKA", "kanal": "MARKET", "satis_litre": 40.0 }
+]

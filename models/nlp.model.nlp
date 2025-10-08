@@ -1,0 +1,877 @@
+{
+  "settings": {
+    "tag": "nlp",
+    "languages": [
+      "tr"
+    ],
+    "calculateSentiment": true,
+    "executeActionsBeforeAnswers": false
+  },
+  "nluManager": {
+    "settings": {
+      "tag": "nlu-manager"
+    },
+    "locales": [
+      "tr"
+    ],
+    "languageNames": {},
+    "domainManagers": {
+      "tr": {
+        "settings": {
+          "locale": "tr",
+          "trainByDomain": false,
+          "tag": "domain-manager-tr",
+          "nluByDomain": {
+            "default": {
+              "className": "NeuralNlu",
+              "settings": {}
+            }
+          },
+          "useStemDict": true
+        },
+        "stemDict": {
+          "litre,satıs,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "kac,kanal,litre,satıl,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "kac,litre,satıl,{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "miktar,satıs,{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "hacmi,satıs,{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "litre,topla,{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "kadar,ne,satıl,{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "miktar,satıs,yıl,{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "2024,litre,market,rak": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "2025,litre,top,viski": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "2025,kadar,ne,satıl,yıl,{urun}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "kadar,litre,ne,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_hacmi_litre",
+            "domain": "default"
+          },
+          "ciro,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "ciros,kadar,ne,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "ciros,kadar,ne,{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "ciro,topla,{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "satıs,tutar,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "ciros,satıs,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "tl,topla,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "ciros,{kanal},{urun},{yil}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "2025,ciro,top,viski": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "2025,ciros,top,viski": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "2024,ciros,market,rak,topla": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "2025,ciros,kadar,ne,yıl,{urun}": {
+            "intent": "rapor.satis_tutar_ciro",
+            "domain": "default"
+          },
+          "yar": {
+            "intent": "yardim.ne_yapabilir",
+            "domain": "default"
+          },
+          "ne,yapabilir": {
+            "intent": "yardim.ne_yapabilir",
+            "domain": "default"
+          },
+          "komut,ne": {
+            "intent": "yardim.ne_yapabilir",
+            "domain": "default"
+          },
+          "kullanır,nasıl": {
+            "intent": "yardim.ne_yapabilir",
+            "domain": "default"
+          }
+        },
+        "intentDict": {
+          "rapor.satis_hacmi_litre": "default",
+          "rapor.satis_tutar_ciro": "default",
+          "yardim.ne_yapabilir": "default"
+        },
+        "sentences": [
+          {
+            "domain": "default",
+            "utterance": "{yil} {kanal} {urun} litre satışı",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {kanal} kanalında {urun} kaç litre satıldı",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {urun} kaç litre satıldı",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {urun} satış miktarı",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {urun} satış hacmi",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{urun} {yil} toplam litre",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "ne kadar {urun} satıldı {yil}",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} yılında {urun} satış miktarı",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "2024 market rakı litre",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "2025 toptan viski litre",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "2025 yılında ne kadar {urun} satıldı",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{urun} {kanal} {yil} litre ne kadar",
+            "intent": "rapor.satis_hacmi_litre"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {kanal} {urun} ciro",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {kanal} {urun} cirosu ne kadar",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {urun} cirosu ne kadar",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {urun} toplam ciro",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {kanal} {urun} satış tutarı",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "{yil} {kanal} {urun} satış cirosu",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "{kanal} {urun} {yil} toplam TL",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "ciro {yil} {kanal} {urun}",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "cirosu {yil} {kanal} {urun}",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "2025 toptan viski ciro",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "2025 toptan viski cirosu",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "2024 market rakı toplam cirosu",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "2025 yılında {urun} cirosu ne kadar",
+            "intent": "rapor.satis_tutar_ciro"
+          },
+          {
+            "domain": "default",
+            "utterance": "yardım",
+            "intent": "yardim.ne_yapabilir"
+          },
+          {
+            "domain": "default",
+            "utterance": "neler yapabilirsin",
+            "intent": "yardim.ne_yapabilir"
+          },
+          {
+            "domain": "default",
+            "utterance": "komutlar neler",
+            "intent": "yardim.ne_yapabilir"
+          },
+          {
+            "domain": "default",
+            "utterance": "nasıl kullanırım",
+            "intent": "yardim.ne_yapabilir"
+          }
+        ],
+        "domains": {
+          "master_domain": {
+            "settings": {
+              "locale": "tr",
+              "tag": "nlu-tr",
+              "keepStopwords": true,
+              "nonefeatureValue": 1,
+              "nonedeltaMultiplier": 1.2,
+              "spellCheck": false,
+              "spellCheckDistance": 1,
+              "filterZeros": true,
+              "log": true
+            },
+            "features": {
+              "2024": 1,
+              "2025": 1,
+              "{yil}": 1,
+              "{kanal}": 1,
+              "{urun}": 1,
+              "litre": 1,
+              "satıs": 1,
+              "kanal": 1,
+              "kac": 1,
+              "satıl": 1,
+              "miktar": 1,
+              "hacmi": 1,
+              "topla": 1,
+              "ne": 1,
+              "kadar": 1,
+              "yıl": 1,
+              "market": 1,
+              "rak": 1,
+              "top": 1,
+              "viski": 1,
+              "ciro": 1,
+              "ciros": 1,
+              "tutar": 1,
+              "tl": 1,
+              "yar": 1,
+              "yapabilir": 1,
+              "komut": 1,
+              "nasıl": 1,
+              "kullanır": 1
+            },
+            "intents": {
+              "rapor.satis_hacmi_litre": 1,
+              "rapor.satis_tutar_ciro": 1,
+              "yardim.ne_yapabilir": 1
+            },
+            "intentFeatures": {
+              "rapor.satis_hacmi_litre": {
+                "2024": 1,
+                "2025": 1,
+                "{yil}": 1,
+                "{kanal}": 1,
+                "{urun}": 1,
+                "litre": 1,
+                "satıs": 1,
+                "kanal": 1,
+                "kac": 1,
+                "satıl": 1,
+                "miktar": 1,
+                "hacmi": 1,
+                "topla": 1,
+                "ne": 1,
+                "kadar": 1,
+                "yıl": 1,
+                "market": 1,
+                "rak": 1,
+                "top": 1,
+                "viski": 1
+              },
+              "rapor.satis_tutar_ciro": {
+                "2024": 1,
+                "2025": 1,
+                "{yil}": 1,
+                "{kanal}": 1,
+                "{urun}": 1,
+                "ciro": 1,
+                "ciros": 1,
+                "ne": 1,
+                "kadar": 1,
+                "topla": 1,
+                "satıs": 1,
+                "tutar": 1,
+                "tl": 1,
+                "top": 1,
+                "viski": 1,
+                "market": 1,
+                "rak": 1,
+                "yıl": 1
+              },
+              "yardim.ne_yapabilir": {
+                "yar": 1,
+                "ne": 1,
+                "yapabilir": 1,
+                "komut": 1,
+                "nasıl": 1,
+                "kullanır": 1
+              }
+            },
+            "featuresToIntent": {
+              "2024": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "2025": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "{yil}": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "{kanal}": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "{urun}": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "litre": [
+                "rapor.satis_hacmi_litre"
+              ],
+              "satıs": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "kanal": [
+                "rapor.satis_hacmi_litre"
+              ],
+              "kac": [
+                "rapor.satis_hacmi_litre"
+              ],
+              "satıl": [
+                "rapor.satis_hacmi_litre"
+              ],
+              "miktar": [
+                "rapor.satis_hacmi_litre"
+              ],
+              "hacmi": [
+                "rapor.satis_hacmi_litre"
+              ],
+              "topla": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "ne": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro",
+                "yardim.ne_yapabilir"
+              ],
+              "kadar": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "yıl": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "market": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "rak": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "top": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "viski": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro"
+              ],
+              "ciro": [
+                "rapor.satis_tutar_ciro"
+              ],
+              "ciros": [
+                "rapor.satis_tutar_ciro"
+              ],
+              "tutar": [
+                "rapor.satis_tutar_ciro"
+              ],
+              "tl": [
+                "rapor.satis_tutar_ciro"
+              ],
+              "yar": [
+                "yardim.ne_yapabilir"
+              ],
+              "yapabilir": [
+                "yardim.ne_yapabilir"
+              ],
+              "komut": [
+                "yardim.ne_yapabilir"
+              ],
+              "nasıl": [
+                "yardim.ne_yapabilir"
+              ],
+              "kullanır": [
+                "yardim.ne_yapabilir"
+              ]
+            },
+            "neuralNetwork": {
+              "settings": {
+                "locale": "tr",
+                "tag": "nlu-tr",
+                "keepStopwords": true,
+                "nonefeatureValue": 1,
+                "nonedeltaMultiplier": 1.2,
+                "spellCheck": false,
+                "spellCheckDistance": 1,
+                "filterZeros": true,
+                "log": true
+              },
+              "features": [
+                "{yil}",
+                "{kanal}",
+                "{urun}",
+                "litre",
+                "satıs",
+                "kanal",
+                "kac",
+                "satıl",
+                "miktar",
+                "hacmi",
+                "topla",
+                "ne",
+                "kadar",
+                "yıl",
+                "2024",
+                "market",
+                "rak",
+                "2025",
+                "top",
+                "viski",
+                "ciro",
+                "ciros",
+                "tutar",
+                "tl",
+                "yar",
+                "yapabilir",
+                "komut",
+                "nasıl",
+                "kullanır"
+              ],
+              "intents": [
+                "rapor.satis_hacmi_litre",
+                "rapor.satis_tutar_ciro",
+                "yardim.ne_yapabilir"
+              ],
+              "perceptrons": [
+                [
+                  1.927844524383545,
+                  -3.9610564708709717,
+                  2.4055094718933105,
+                  8.804112434387207,
+                  4.504149913787842,
+                  3.9353690147399902,
+                  -4.259186744689941,
+                  4.8226447105407715,
+                  4.849370002746582,
+                  4.850583553314209,
+                  0.5403165817260742,
+                  0.8288933038711548,
+                  3.687621831893921,
+                  -0.003564902115613222,
+                  1.6268045902252197,
+                  1.6268045902252197,
+                  1.6268045902252197,
+                  1.944005012512207,
+                  1.4662874937057495,
+                  1.4662874937057495,
+                  -5.474580764770508,
+                  -9.477474212646484,
+                  -5.624655246734619,
+                  -1.5100750923156738,
+                  -0.8745259046554565,
+                  -1.4293333292007446,
+                  -1.4290943145751953,
+                  -0.534392237663269,
+                  -0.534392237663269,
+                  0.6002570086962837
+                ],
+                [
+                  1.7659903764724731,
+                  1.3116374015808105,
+                  2.537834882736206,
+                  -8.621020317077637,
+                  -0.1678066849708557,
+                  -0.8364365696907043,
+                  -1.283826470375061,
+                  -6.614723205566406,
+                  -5.032829284667969,
+                  -5.01663064956665,
+                  1.8445416688919067,
+                  -0.5929037928581238,
+                  1.2657068967819214,
+                  -0.05948444455862045,
+                  1.2194401025772095,
+                  1.2194401025772095,
+                  1.2194401025772095,
+                  2.390514612197876,
+                  1.6219847202301025,
+                  1.6219847202301025,
+                  7.559614658355713,
+                  7.7653117179870605,
+                  7.930243492126465,
+                  5.741504192352295,
+                  -0.9726463556289673,
+                  -0.8639470338821411,
+                  -0.8718838691711426,
+                  -0.5385192036628723,
+                  -0.5385192036628723,
+                  0.989829382182351
+                ],
+                [
+                  -2.6765215396881104,
+                  -0.7138314247131348,
+                  -3.493569850921631,
+                  -1.9400854110717773,
+                  -0.35718804597854614,
+                  -0.05753852054476738,
+                  -0.12784989178180695,
+                  -1.781571865081787,
+                  -0.11596676707267761,
+                  -0.06272229552268982,
+                  -0.4500789940357208,
+                  4.339756965637207,
+                  -2.8732967376708984,
+                  -0.8093435168266296,
+                  -1.4664498567581177,
+                  -1.4664498567581177,
+                  -1.4664498567581177,
+                  -2.310615301132202,
+                  -1.4935662746429443,
+                  -1.4935662746429443,
+                  -1.04168701171875,
+                  -1.6358035802841187,
+                  0,
+                  0,
+                  7.946276664733887,
+                  3.606523036956787,
+                  3.606523275375366,
+                  3.973140001296997,
+                  3.973140001296997,
+                  6.339434947659392
+                ]
+              ]
+            }
+          }
+        }
+      }
+    },
+    "intentDomains": {},
+    "extraSentences": [
+      [
+        "tr",
+        "{yil} {kanal} {urun} litre satışı"
+      ],
+      [
+        "tr",
+        "{yil} {kanal} kanalında {urun} kaç litre satıldı"
+      ],
+      [
+        "tr",
+        "{yil} {urun} kaç litre satıldı"
+      ],
+      [
+        "tr",
+        "{yil} {urun} satış miktarı"
+      ],
+      [
+        "tr",
+        "{yil} {urun} satış hacmi"
+      ],
+      [
+        "tr",
+        "{urun} {yil} toplam litre"
+      ],
+      [
+        "tr",
+        "ne kadar {urun} satıldı {yil}"
+      ],
+      [
+        "tr",
+        "{yil} yılında {urun} satış miktarı"
+      ],
+      [
+        "tr",
+        "2024 market rakı litre"
+      ],
+      [
+        "tr",
+        "2025 toptan viski litre"
+      ],
+      [
+        "tr",
+        "2025 yılında ne kadar {urun} satıldı"
+      ],
+      [
+        "tr",
+        "{urun} {kanal} {yil} litre ne kadar"
+      ],
+      [
+        "tr",
+        "{yil} {kanal} {urun} ciro"
+      ],
+      [
+        "tr",
+        "{yil} {kanal} {urun} cirosu ne kadar"
+      ],
+      [
+        "tr",
+        "{yil} {urun} cirosu ne kadar"
+      ],
+      [
+        "tr",
+        "{yil} {urun} toplam ciro"
+      ],
+      [
+        "tr",
+        "{yil} {kanal} {urun} satış tutarı"
+      ],
+      [
+        "tr",
+        "{yil} {kanal} {urun} satış cirosu"
+      ],
+      [
+        "tr",
+        "{kanal} {urun} {yil} toplam TL"
+      ],
+      [
+        "tr",
+        "ciro {yil} {kanal} {urun}"
+      ],
+      [
+        "tr",
+        "cirosu {yil} {kanal} {urun}"
+      ],
+      [
+        "tr",
+        "2025 toptan viski ciro"
+      ],
+      [
+        "tr",
+        "2025 toptan viski cirosu"
+      ],
+      [
+        "tr",
+        "2024 market rakı toplam cirosu"
+      ],
+      [
+        "tr",
+        "2025 yılında {urun} cirosu ne kadar"
+      ],
+      [
+        "tr",
+        "yardım"
+      ],
+      [
+        "tr",
+        "neler yapabilirsin"
+      ],
+      [
+        "tr",
+        "komutlar neler"
+      ],
+      [
+        "tr",
+        "nasıl kullanırım"
+      ]
+    ]
+  },
+  "ner": {
+    "settings": {
+      "tag": "ner"
+    },
+    "rules": {
+      "tr": {
+        "yil": {
+          "name": "yil",
+          "type": "regex",
+          "rules": [
+            "/(19|20)\\d{2}|\\b(\\d{4})\\b/giu"
+          ]
+        },
+        "urun": {
+          "name": "urun",
+          "type": "regex",
+          "rules": [
+            "/\\b(rakı|raki|rakı|viski|whisky|whiskey|vodka|votka|cin|gin|likör|likor)\\b/giu",
+            {
+              "option": "RAKI",
+              "texts": [
+                "rakı",
+                "raki"
+              ]
+            },
+            {
+              "option": "WHISKY",
+              "texts": [
+                "viski",
+                "whisky",
+                "whiskey"
+              ]
+            },
+            {
+              "option": "VODKA",
+              "texts": [
+                "vodka",
+                "votka"
+              ]
+            },
+            {
+              "option": "GIN",
+              "texts": [
+                "gin",
+                "cin"
+              ]
+            },
+            {
+              "option": "LIKOR",
+              "texts": [
+                "likör",
+                "likor"
+              ]
+            }
+          ]
+        },
+        "kanal": {
+          "name": "kanal",
+          "type": "regex",
+          "rules": [
+            "/\\b(market|markette|toptan|perakende|online|e-?ticaret)\\b/giu",
+            {
+              "option": "market",
+              "texts": [
+                "market",
+                "markette",
+                "market te",
+                "perakende"
+              ]
+            },
+            {
+              "option": "toptan",
+              "texts": [
+                "toptan",
+                "wholesale"
+              ]
+            },
+            {
+              "option": "online",
+              "texts": [
+                "online",
+                "e-ticaret",
+                "eticaret"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "nlgManager": {
+    "settings": {
+      "tag": "nlg-manager"
+    },
+    "responses": {}
+  },
+  "actionManager": {
+    "settings": {
+      "tag": "action-manager"
+    },
+    "actions": {}
+  },
+  "slotManager": {}
+}

@@ -1,10 +1,56 @@
 <%- include('partials/header') %>
 <%- include('partials/sidebar') %>
 
+<style>
+    .prompt-container {
+        background-color: #fff;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-top: 2rem;
+    }
+    .prompt-container h2 {
+        margin-bottom: 1rem;
+        color: var(--secondary-color);
+    }
+    .prompt-form {
+        display: flex;
+        gap: 1rem;
+    }
+    .prompt-form input[type="text"] {
+        flex-grow: 1;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 1.1rem;
+    }
+    .prompt-form button {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        background-color: var(--primary-color);
+        cursor: pointer;
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+    .prompt-form button:hover {
+        background-color: #2980b9;
+    }
+</style>
+
 <main class="main-content">
 
-    <h1><%= icerik %></h1>
-    <p>Görüntülemek istediğiniz raporu sol taraftaki menüden seçebilirsiniz.</p>
+    <h1><i class="fa-solid fa-house"></i> <%= icerik %></h1>
+    <p>Görüntülemek istediğiniz raporu sol taraftaki menüden seçebilir veya aşağıdaki kutucuğa yazarak sorgulayabilirsiniz.</p>
+
+    <div class="prompt-container">
+        <h2>Sohbet Bazlı Raporlama (Prototip)</h2>
+        <form action="/sorgula" method="GET" class="prompt-form">
+            <input type="text" name="prompt" placeholder="Örn: 2024 yılında markette kaç litre rakı satıldı?" required>
+            <button type="submit">Sorgula</button>
+        </form>
+    </div>
 </main>
 
 <%- include('partials/footer') %>

@@ -10,6 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@nlpjs/basic": "^5.0.0-alpha.5",
+    "@nlpjs/lang-tr": "^5.0.0-alpha.5",
+    "dayjs": "^1.11.18",
     "dotenv": "^17.2.2",
     "ejs": "^3.1.10",
     "express": "^5.1.0",

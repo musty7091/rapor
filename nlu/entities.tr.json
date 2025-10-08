@@ -1,0 +1,27 @@
+{
+  "regexps": [
+    { "name": "yil", "pattern": "(19|20)\\d{2}|\\b(\\d{4})\\b" },
+    { "name": "urun", "pattern": "\\b(rakı|raki|rakı|viski|whisky|whiskey|vodka|votka|cin|gin|likör|likor)\\b" },
+    { "name": "kanal", "pattern": "\\b(market|markette|toptan|perakende|online|e-?ticaret)\\b" }
+  ],
+  "dictionaries": [
+    {
+      "name": "urun",
+      "pairs": [
+        ["rakı","RAKI"], ["raki","RAKI"],
+        ["viski","WHISKY"], ["whisky","WHISKY"], ["whiskey","WHISKY"],
+        ["vodka","VODKA"], ["votka","VODKA"],
+        ["gin","GIN"], ["cin","GIN"],
+        ["likör","LIKOR"], ["likor","LIKOR"]
+      ]
+    },
+    {
+      "name": "kanal",
+      "pairs": [
+        ["market","market"], ["markette","market"], ["market te","market"], ["perakende","market"],
+        ["toptan","toptan"], ["wholesale","toptan"],
+        ["online","online"], ["e-ticaret","online"], ["eticaret","online"]
+      ]
+    }
+  ]
+}

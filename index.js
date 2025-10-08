@@ -146,19 +146,59 @@ const getFilterData = async (options = []) => {
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 
-// === ANA SAYFA ===
+// === ANA SAYFA VE SORGULAMA ROTASI ===
 app.get('/', (req, res) => {
     res.render('index', { sayfaBasligi: 'Ana Sayfa', icerik: 'Rapor Uygulamasına Hoş Geldiniz!' });
 });
+
+app.get('/sorgula', async (req, res) => {
+    try {
+        const { prompt } = req.query;
+        if (!prompt) {
+            return res.redirect('/');
+        }
+
+        const lowerPrompt = prompt.toLowerCase();
+        let params = {};
+
+        if (lowerPrompt.includes('litre')) params.metrik = 'litre';
+        else if (lowerPrompt.includes('tutar') || lowerPrompt.includes('ciro')) params.metrik = 'tutar';
+        else params.metrik = 'adet';
+
+        if (lowerPrompt.includes('market')) params.fis_turu = 'market';
+        else if (lowerPrompt.includes('toptan')) params.fis_turu = 'toptan';
+
+        if (lowerPrompt.includes('rakı')) params.urun_grubu = 'RAKI';
+
+        const yearMatch = lowerPrompt.match(/\b(2024|2025)\b/);
+        if (yearMatch) {
+            const year = yearMatch[0];
+            params.zamanAraligi = 'manuel';
+            params.baslangicTarihi = `${year}-01-01`;
+            params.bitisTarihi = `${year}-12-31`;
+        }
+
+        const queryString = new URLSearchParams(params).toString();
+        
+        res.redirect(`/urun-kiyaslama?${queryString}`);
+
+    } catch (err) {
+        console.error("Hata - Sorgulama: ", err);
+        res.status(500).send('Sorgu işlenirken bir hata oluştu.');
+    }
+});
+
 
 // === SATIŞ RAPORLARI ===
 app.get('/temsilci-performans', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { yil, ay, temsilci, musteri, tedarikci } = req.query;
+        const { yil, ay, temsilci, musteri, tedarikci, fis_turu } = req.query;
         const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
 
         let musteriQuery = `SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY_TUMU WHERE ${BASE_WHERE_CLAUSE_SIMPLE}`;
@@ -166,6 +206,11 @@ app.get('/temsilci-performans', async (req, res) => {
         if (yil) { musteriQuery += ` AND YIL = @yilParam`; musteriRequest.input('yilParam', sql.Int, yil); }
         if (ay) { musteriQuery += ` AND AY = @ayParam`; musteriRequest.input('ayParam', sql.Int, ay); }
         if (temsilci) { musteriQuery += ` AND SATISTEMSILCI = @temsilciParam`; musteriRequest.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (fis_turu === 'toptan') {
+            musteriQuery += ` AND FIS_TURU IN (21, 23)`;
+        } else if (fis_turu === 'market') {
+            musteriQuery += ` AND FIS_TURU IN (101, 102)`;
+        }
         musteriQuery += ` ORDER BY FIRMAADI`;
         const musteriler = (await musteriRequest.query(musteriQuery)).recordset;
 
@@ -184,6 +229,11 @@ app.get('/temsilci-performans', async (req, res) => {
         if (temsilci) { query += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
         if (musteri) { query += ` AND FIRMAADI = @musteriParam`; request.input('musteriParam', sql.NVarChar, musteri); }
         if (tedarikci) { query += ` AND TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        if (fis_turu === 'toptan') {
+            query += ` AND FIS_TURU IN (21, 23)`;
+        } else if (fis_turu === 'market') {
+            query += ` AND FIS_TURU IN (101, 102)`;
+        }
         
         const result = await request.query(query);
 
@@ -193,7 +243,7 @@ app.get('/temsilci-performans', async (req, res) => {
             musteriler, 
             tedarikciler,
             sonuc: result.recordset[0], 
-            filtreler: { yil, ay, temsilci, musteri, tedarikci } 
+            filtreler: { yil, ay, temsilci, musteri, tedarikci, fis_turu } 
         });
     } catch (err) { console.error("Hata - Temsilci Performansı: ", err); res.status(500).send('Hata oluştu'); }
 });
@@ -295,6 +345,7 @@ app.get('/top-10-satis', async (req, res) => {
         res.status(500).send('Hata oluştu');
     }
 });
+
 
 // === KARLILIK RAPORLARI ===
 app.get('/urun-karlilik', async (req, res) => {
@@ -1401,6 +1452,111 @@ app.get('/ham-veri', async (req, res) => {
         console.error("Hata - Ham Veri Görüntüleyici: ", err);
         res.status(500).send('Hata oluştu');
     }
+});
+
+// === NLU ENTEGRASYONU ===
+const { dockStart } = require('@nlpjs/basic');
+const fs = require('fs');
+
+let nlp;
+async function ensureNlp() {
+  if (!nlp) {
+    const dock = await dockStart({
+      settings: { nlp: { languages: ['tr'] } },
+      use: ['Basic', 'LangTr']
+    });
+    nlp = dock.get('nlp');
+    await nlp.load(path.join(__dirname, 'models', 'nlp.model.nlp'));
+  }
+}
+
+// 1️⃣ Sağlık kontrolü
+app.get('/healthz', (req, res) => res.status(200).send('OK'));
+
+// 2️⃣ NLU parse endpoint
+app.post('/nlu/parse', async (req, res) => {
+  try {
+    await ensureNlp();
+    const text = (req.body?.text || '').toString();
+    if (!text.trim()) return res.status(400).json({ error: 'text required' });
+
+    const result = await nlp.process('tr', text);
+    const confidence = result.intent ? result.score : 0;
+
+    if (confidence < 0.6) {
+      return res.json({
+        ok: true,
+        intent: 'fallback',
+        confidence,
+        suggestions: ["2024 yılında markette kaç litre rakı satıldı", "yardım"]
+      });
+    }
+
+    const slots = {};
+    for (const e of (result.entities || [])) slots[e.entity] = e.sourceText;
+    res.json({ ok: true, intent: result.intent, confidence, slots });
+  } catch (err) {
+    console.error('💥 NLU parse hatası:', err);
+    res.status(500).json({ ok: false, error: 'parse-failed' });
+  }
+});
+
+// 3️⃣ Intent → Aksiyon endpoint
+app.post('/action', async (req, res) => {
+  try {
+    const { intent, slots } = req.body || {};
+    if (!intent) return res.status(400).json({ error: 'intent gerekli' });
+
+    switch (intent) {
+      case 'rapor.satis_hacmi_litre': {
+        const yil = (slots?.yil || '2024').toString().replace(/[^\d]/g, '');
+        const urun = slots?.urun || 'rakı';
+        const kanal = (slots?.kanal || 'market').toLowerCase();
+
+        // Basit demo sorgusu: MARKET ve RAKI satışlarını litre olarak getir
+        const pool = await poolPromise;
+        const request = pool.request();
+        let query = `
+          SELECT SUM(SATIS_MIKTAR_LITRE) as ToplamLitre
+          FROM YC_SATIS_DETAY_TUMU
+          WHERE YIL = @yil AND URUN_GRUBU = 'RAKI'
+        `;
+        request.input('yil', sql.Int, yil);
+        if (kanal === 'market') query += ' AND FIS_TURU IN (101,102)';
+        else if (kanal === 'toptan') query += ' AND FIS_TURU IN (21,23)';
+
+        const result = await request.query(query);
+        const toplam = result.recordset[0]?.ToplamLitre || 0;
+        return res.json({
+          ok: true,
+          intent,
+          yil,
+          sonuc: `${yil} yılında ${kanal} kanalında toplam ${toplam.toLocaleString('tr-TR')} litre ${urun} satıldı.`
+        });
+      }
+
+      case 'yardim.ne_yapabilir':
+        return res.json({
+          ok: true,
+          intent,
+          komutlar: [
+            "2024 yılında markette kaç litre rakı satıldı",
+            "yardım"
+          ]
+        });
+
+      default:
+        return res.status(400).json({ ok: false, error: `Bilinmeyen intent: ${intent}` });
+    }
+  } catch (err) {
+    console.error('💥 ACTION hatası:', err);
+    res.status(500).json({ ok: false, error: 'action-failed' });
+  }
+});
+
+// 4️⃣ Test sayfası
+app.get('/nlu-test', (req, res) => {
+  res.render('nlu_test');
 });
 
 app.listen(PORT, () => {

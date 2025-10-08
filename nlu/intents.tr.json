@@ -1,0 +1,44 @@
+{
+  "language": "tr",
+  "data": [
+    {
+      "intent": "rapor.satis_hacmi_litre",
+      "utterances": [
+        "{yil} {kanal} {urun} litre satışı",
+        "{yil} {kanal} kanalında {urun} kaç litre satıldı",
+        "{yil} {urun} kaç litre satıldı",
+        "{yil} {urun} satış miktarı",
+        "{yil} {urun} satış hacmi",
+        "{urun} {yil} toplam litre",
+        "ne kadar {urun} satıldı {yil}",
+        "{yil} yılında {urun} satış miktarı",
+        "2024 market rakı litre",
+        "2025 toptan viski litre",
+        "2025 yılında ne kadar {urun} satıldı",
+        "{urun} {kanal} {yil} litre ne kadar"
+      ]
+    },
+    {
+      "intent": "rapor.satis_tutar_ciro",
+      "utterances": [
+        "{yil} {kanal} {urun} ciro",
+        "{yil} {kanal} {urun} cirosu ne kadar",
+        "{yil} {urun} cirosu ne kadar",
+        "{yil} {urun} toplam ciro",
+        "{yil} {kanal} {urun} satış tutarı",
+        "{yil} {kanal} {urun} satış cirosu",
+        "{kanal} {urun} {yil} toplam TL",
+        "ciro {yil} {kanal} {urun}",
+        "cirosu {yil} {kanal} {urun}",
+        "2025 toptan viski ciro",
+        "2025 toptan viski cirosu",
+        "2024 market rakı toplam cirosu",
+        "2025 yılında {urun} cirosu ne kadar"
+      ]
+    },
+    {
+      "intent": "yardim.ne_yapabilir",
+      "utterances": ["yardım", "neler yapabilirsin", "komutlar neler", "nasıl kullanırım"]
+    }
+  ]
+}

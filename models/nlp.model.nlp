@@ -777,18 +777,10 @@
     },
     "rules": {
       "tr": {
-        "yil": {
-          "name": "yil",
-          "type": "regex",
-          "rules": [
-            "/(19|20)\\d{2}|\\b(\\d{4})\\b/giu"
-          ]
-        },
         "urun": {
           "name": "urun",
-          "type": "regex",
+          "type": "enum",
           "rules": [
-            "/\\b(rakı|raki|rakı|viski|whisky|whiskey|vodka|votka|cin|gin|likör|likor)\\b/giu",
             {
               "option": "RAKI",
               "texts": [
@@ -829,23 +821,20 @@
         },
         "kanal": {
           "name": "kanal",
-          "type": "regex",
+          "type": "enum",
           "rules": [
-            "/\\b(market|markette|toptan|perakende|online|e-?ticaret)\\b/giu",
             {
               "option": "market",
               "texts": [
                 "market",
                 "markette",
-                "market te",
                 "perakende"
               ]
             },
             {
               "option": "toptan",
               "texts": [
-                "toptan",
-                "wholesale"
+                "toptan"
               ]
             },
             {

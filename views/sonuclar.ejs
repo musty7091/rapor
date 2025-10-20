@@ -2,6 +2,16 @@
     <div class="sidebar-header">
         <h3>Rapor Paneli</h3>
     </div>
+
+    <!-- YENİ EKLENEN NLU SORGULAMA FORMU -->
+    <div class="nlu-form-container">
+        <form action="/sorgu" method="POST">
+            <input type="text" id="nluQueryInput" name="nluQuery" placeholder="Sorgunuzu buraya yazın..." required>
+            <button type="submit" id="nluQueryBtn">Sorgula</button>
+        </form>
+    </div>
+    <!-- YENİ FORM SONU -->
+
     <nav class="sidebar-nav">
         <ul class="menu">
             <li><a href="/"><i class="fa-solid fa-house"></i> Ana Sayfa</a></li>
@@ -24,16 +34,14 @@
                 <span class="menu-title"><i class="fa-solid fa-scale-balanced"></i> Karşılaştırmalı Raporlar</span>
                  <ul class="submenu">
                      <li><a href="/temsilci-kiyaslama">Temsilci Kıyaslama</a></li>
-                     <li><a href="/urun-kiyaslama">Yıllık Ürün Kıyaslama</a></li>
-                     <%# YENİ EKLENEN RAPOR LİNKİ %>
-                     <li><a href="/tedarikci-kategori-kiyaslama">Tedarikçi Kategori Kıyaslama</a></li>
-                </ul>
-            </li>
-            <li class="menu-item">
-                 <span class="menu-title"><i class="fa-solid fa-lightbulb"></i> Stratejik Raporlar</span>
+                     <li><a href="/urun-kiyaslama">Yıllık Kıyaslama</a></li>
+                 </ul>
+             </li>
+             <li class="menu-item">
+                <span class="menu-title"><i class="fa-solid fa-lightbulb"></i> Stratejik Raporlar</span>
                 <ul class="submenu">
-                     <li><a href="/urun-potansiyeli">Ürün Potansiyeli</a></li>
-                     <li><a href="/musteri-potansiyeli">Müşteri Potansiyeli</a></li>
+                     <li><a href="/urun-potansiyeli">Müşteri Ürün Potansiyeli</a></li>
+                     <li><a href="/musteri-potansiyeli">Ürün Müşteri Potansiyeli</a></li>
                      <li><a href="/musteri-kayip-urun">Müşteri Kayıp/Yeni Ürün</a></li>
                      <li><a href="/musteri-deger-analizi">Müşteri Değer Analizi (ABC)</a></li>
                      <li><a href="/kayip-musteri-analizi">Kayıp Müşteri Analizi</a></li>
@@ -59,8 +67,9 @@
                 <span class="menu-title"><i class="fa-solid fa-screwdriver-wrench"></i> Geliştirici Araçları</span>
                 <ul class="submenu">
                     <li><a href="/ham-veri">Ham Veri Görüntüleyici</a></li>
+                    <li><a href="/nlu-test">NLU Test Sayfası</a></li>
                 </ul>
-            </li>
+             </li>
         </ul>
     </nav>
 </aside>

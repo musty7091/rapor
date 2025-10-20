@@ -1,40 +1,36 @@
 // routes/nlu.js
-const express = require('express');
-const router = express.Router();
-const { dockStart } = require('@nlpjs/basic');
+const { NlpManager } = require('node-nlp');
 const path = require('path');
+const fs = require('fs');
+
+const modelPath = path.join(__dirname, 'nlp.model.nlp');
+const manager = new NlpManager({ languages: ['tr'], nlu: { log: false } });
 
 let nlp;
-
 async function ensureNlp() {
   if (!nlp) {
-    const dock = await dockStart({
-      settings: { nlp: { languages: ['tr'] } },
-      use: ['Basic', 'LangTr']
-    });
+    const dock = await dockStart({ settings: { nlp: { languages: ['tr'] } }, use: ['Basic', 'LangTr'] });
     nlp = dock.get('nlp');
     await nlp.load(path.join(__dirname, '..', 'models', 'nlp.model.nlp'));
   }
 }
 
-// 🔎 basit metin tabanlı yedek çıkarım
 function fallbackExtract(text) {
   const t = (text || '').toString();
-  const low = t.toLowerCase('tr-TR');
-
-  const yil = (t.match(/(19|20)\d{2}/) || [])[0] || null;
+  const low = t.toLowerCase('tr');
+  const yil = (t.match(/(?:19|20)\d{2}/) || [])[0] || null;
 
   let urun = null;
-  if (/\b(whisky|whiskey|viski)\b/i.test(t)) urun = 'WHISKY';
-  else if (/\b(rakı|raki)\b/i.test(t)) urun = 'RAKI';
-  else if (/\b(vodka|votka)\b/i.test(t)) urun = 'VODKA';
-  else if (/\b(gin|cin)\b/i.test(t)) urun = 'GIN';
-  else if (/\b(likör|likor)\b/i.test(t)) urun = 'LIKOR';
+  if (/(whisky|whiskey|viski)/iu.test(t)) urun = 'WHISKY';
+  else if (/(rakı|raki)/iu.test(t)) urun = 'RAKI';
+  else if (/(vodka|votka)/iu.test(t)) urun = 'VODKA';
+  else if (/(gin|cin)/iu.test(t)) urun = 'GIN';
+  else if (/(likör|likor)/iu.test(t)) urun = 'LIKOR';
 
   let kanal = null;
-  if (/\b(toptan)\b/i.test(low)) kanal = 'toptan';
-  else if (/\b(market|markette|perakende)\b/i.test(low)) kanal = 'market';
-  else if (/\b(online|e-?ticaret|eticaret)\b/i.test(low)) kanal = 'online';
+  if (/\btoptan\b/iu.test(low)) kanal = 'toptan';
+  else if (/\b(market|markette|perakende)\b/iu.test(low)) kanal = 'market';
+  else if (/\b(online|e-?ticaret|eticaret)\b/iu.test(low)) kanal = 'online';
 
   return { yil, urun, kanal };
 }
@@ -42,46 +38,25 @@ function fallbackExtract(text) {
 router.post('/parse', async (req, res) => {
   try {
     await ensureNlp();
-    const text = (req.body?.text || req.query?.text || '').toString();
-    if (!text.trim()) return res.status(400).json({ error: 'text required' });
+    const text = (req.body?.text || '').toString();
+    if (!text.trim()) return res.status(400).json({ ok: false, error: 'text required' });
 
     const result = await nlp.process('tr', text);
-    const confidence = result.intent ? result.score : 0;
-    const threshold = 0.45; // biraz esnek
-
-    if (confidence < threshold) {
-      return res.json({
-        ok: true,
-        intent: 'fallback',
-        confidence,
-        suggestions: [
-          "2024 market rakı litre",
-          "2025 toptan viski ciro"
-        ]
-      });
-    }
-
-    // 1) NLU'dan gelenler
     const slots = {};
-    for (const e of (result.entities || [])) {
-      slots[e.entity] = e.sourceText;
-    }
+    for (const e of (result.entities || [])) slots[e.entity] = e.sourceText;
 
-    // 2) Yedek metin çıkarımı (boş olanları doldur)
+    // ➕ metinden eksik olanları tamamla
     const fb = fallbackExtract(text);
-    if (!slots.yil && fb.yil)   slots.yil = fb.yil;
+    if (!slots.yil && fb.yil) slots.yil = fb.yil;
     if (!slots.kanal && fb.kanal) slots.kanal = fb.kanal;
     if (!slots.urun && fb.urun) slots.urun = fb.urun;
 
-    // Normalize
+    // normalize
     if (slots.yil) slots.yil = (String(slots.yil).match(/(19|20)\d{2}/) || [])[0];
     if (slots.kanal) slots.kanal = String(slots.kanal).toLowerCase();
-    if (slots.urun)  slots.urun  = String(slots.urun).toUpperCase();
+    if (slots.urun) slots.urun = String(slots.urun).toUpperCase();
 
-    // Görmek istersen konsola bas
-    console.log('🧠 intent:', result.intent, 'score:', confidence, 'slots:', slots);
-
-    return res.json({ ok: true, intent: result.intent, confidence, slots });
+    return res.json({ ok: true, intent: result.intent || 'rapor.satis_hacmi_litre', confidence: result.score || 0, slots });
   } catch (err) {
     console.error('💥 NLU ERROR:', err);
     res.status(500).json({ ok: false, error: 'parse-failed' });

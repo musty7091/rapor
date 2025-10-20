@@ -1,0 +1,141 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<style>
+    @media print {
+        @page {
+            size: A4 landscape;
+        }
+    }
+    .kategori-row {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+    .kategori-row td {
+        padding-top: 15px;
+        padding-bottom: 15px;
+        color: var(--secondary-color);
+    }
+    .grup-row td:first-child {
+        padding-left: 40px; /* Ürün grubu için girinti */
+    }
+    table th {
+        white-space: normal !important;
+    }
+</style>
+
+<main class="main-content">
+    <h1>
+        <i class="fa-solid fa-tags"></i> <%= sayfaBasligi %>
+        <button onclick="window.print()" class="print-button">
+            <i class="fa-solid fa-file-pdf"></i> PDF Olarak Kaydet
+        </button>
+    </h1>
+    <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
+        Seçilen tedarikçinin 2024 ve 2025 yılı Market (Perakende) satışlarını kategori ve ürün grubu bazında karşılaştırır.
+    </p>
+
+    <div class="print-summary">
+        <h4>Filtre Özeti</h4>
+        <% if (filtreler.tedarikci) { %><p><strong>Tedarikçi:</strong> <%= filtreler.tedarikci %></p><% } %>
+        <% if (filtreler.metrik) { %><p><strong>Metrik:</strong> <%= filtreler.metrik.charAt(0).toUpperCase() + filtreler.metrik.slice(1) %></p><% } %>
+        <p><strong>Satış Tipi:</strong> Market Satış (101, 102)</p>
+        <p><strong>Yıl Karşılaştırması:</strong> 2024 vs 2025</p>
+    </div>
+
+    <form method="GET" class="filter-form">
+        <div class="form-group" style="flex-grow: 2;">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci" required>
+                <option value="">Lütfen bir tedarikçi seçin...</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>><%= t.TEDARIKCI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="metrik">Analiz Metriği</label>
+            <select name="metrik" id="metrik">
+                <option value="tutar" <%= (filtreler.metrik === 'tutar') ? 'selected' : '' %>>Tutar</option>
+                <option value="adet" <%= (filtreler.metrik === 'adet') ? 'selected' : '' %>>Adet</option>
+                <option value="litre" <%= (filtreler.metrik === 'litre') ? 'selected' : '' %>>Litre</option>
+            </select>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+            <a href="/tedarikci-kategori-kiyaslama" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+
+    <% if (sonuclar && sonuclar.length > 0) { %>
+        <% 
+            let birimText = 'TL';
+            if (filtreler.metrik === 'litre') birimText = 'Litre';
+            if (filtreler.metrik === 'adet') birimText = 'Adet';
+
+            const formatNumber = (num) => {
+                if (filtreler.metrik === 'tutar') {
+                    return num.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
+                }
+                const birimSuffix = filtreler.metrik === 'litre' ? ' L' : '';
+                return num.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) + birimSuffix;
+            };
+        %>
+        <table>
+            <thead>
+                <tr>
+                    <th>Kategori / Ürün Grubu</th>
+                    <th>2024 Net <%= birimText %></th>
+                    <th>2025 Net <%= birimText %></th>
+                    <th>Büyüme %</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% sonuclar.forEach(kategori => { %>
+                    <% 
+                        let kategoriDegisim = 0;
+                        if (kategori.Toplam2024 > 0) {
+                            kategoriDegisim = ((kategori.Toplam2025 - kategori.Toplam2024) / kategori.Toplam2024) * 100;
+                        } else if (kategori.Toplam2025 > 0) {
+                            kategoriDegisim = 100;
+                        }
+                    %>
+                    <tr class="kategori-row">
+                        <td><i class="fa-solid fa-folder-open"></i> <%= kategori.KATEGORI %></td>
+                        <td class="sayisal"><%= formatNumber(kategori.Toplam2024) %></td>
+                        <td class="sayisal"><%= formatNumber(kategori.Toplam2025) %></td>
+                        <td class="sayisal <%= kategoriDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
+                            <%= kategoriDegisim.toFixed(2) %>%
+                        </td>
+                    </tr>
+                    <% kategori.urunGruplari.forEach(grup => { %>
+                        <% 
+                            let grupDegisim = 0;
+                            if (grup.Metrik2024 > 0) {
+                                grupDegisim = ((grup.Metrik2025 - grup.Metrik2024) / grup.Metrik2024) * 100;
+                            } else if (grup.Metrik2025 > 0) {
+                                grupDegisim = 100;
+                            }
+                        %>
+                        <tr class="grup-row">
+                            <td><%= grup.URUN_GRUBU %></td>
+                            <td class="sayisal"><%= formatNumber(grup.Metrik2024) %></td>
+                            <td class="sayisal"><%= formatNumber(grup.Metrik2025) %></td>
+                            <td class="sayisal <%= grupDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
+                                <%= grupDegisim.toFixed(2) %>%
+                            </td>
+                        </tr>
+                    <% }) %>
+                <% }) %>
+            </tbody>
+        </table>
+    <% } else if (filtreler.tedarikci) { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Seçilen tedarikçi için "Market Satış" verisi bulunamadı.</p>
+        </div>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>

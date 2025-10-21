@@ -16,7 +16,7 @@ const dbConfig = {
         encrypt: false,
         trustServerCertificate: true
     },
-    requestTimeout: 60000 // Kayıp Müşteri Timeout hatası alırsanız burayı artırabilirsiniz (örn: 120000)
+    requestTimeout: 120000 // Kayıp Müşteri Timeout hatası alırsanız burayı artırabilirsiniz (örn: 120000)
 };
 
 // NET HESAPLAMA SABİTLERİ
@@ -787,27 +787,6 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
     }
 });
 
-
-// === DÖNEM RAPORLARI ===
-app.get('/aylik-trend', async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
-        const result = await pool.request().query(`
-            WITH ${KARLILIK_HESAPLAMA_CTES_DEF}
-            SELECT YIL, AY,
-                SUM(${NET_TUTAR_ANAVERI}) as ToplamCiro,
-                SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)) as ToplamKar
-            FROM AnaVeri
-            WHERE AnaVeri.YIL IN (2024, 2025)
-                AND AnaVeri.STOK_ADI <> 'HİZMET'
-                AND AnaVeri.TEDARIKCI <> 'GENEL HARCAMA'
-            GROUP BY YIL, AY ORDER BY YIL, AY
-        `);
-        res.render('aylik-trend', { sayfaBasligi: 'Aylık Ciro ve Kârlılık Trendi', sonuclar: result.recordset });
-    } catch (err) { console.error("Hata - Aylık Trend: ", err); res.status(500).send('Hata oluştu'); }
-});
-
 // === STRATEJİK RAPORLAR ===
 app.get('/urun-potansiyeli', async (req, res) => {
     try {
@@ -1432,70 +1411,6 @@ app.get('/musteri-bagimliligi', async (req, res) => {
         res.status(500).send('Hata oluştu');
     }
 });
-
-app.get('/urun-kanibalizasyon', async (req, res) => {
-    try {
-        const { eski_urun, yeni_urun } = req.query;
-        const { urunler } = await getFilterData(['urunler']);
-
-        let chartData = null;
-        if (eski_urun && yeni_urun) {
-            const pool = await poolPromise;
-            const request = pool.request();
-            request.input('eskiUrun', sql.NVarChar, eski_urun);
-            request.input('yeniUrun', sql.NVarChar, yeni_urun);
-
-            const lansmanResult = await pool.request().input('yeniUrun', sql.NVarChar, yeni_urun).query('SELECT MIN(TARIH) as LansmanTarihi FROM YC_SATIS_DETAY_TUMU WHERE STOK_ADI = @yeniUrun AND FIS_TURU IN (21, 101)');
-            const lansmanTarihi = lansmanResult.recordset[0].LansmanTarihi;
-
-            const salesQuery = `
-                SELECT
-                    STOK_ADI,
-                    YIL,
-                    AY,
-                    SUM(${NET_MIKTAR.replace('s.','')}) as ToplamMiktar
-                FROM YC_SATIS_DETAY_TUMU s
-                WHERE STOK_ADI IN (@eskiUrun, @yeniUrun)
-                GROUP BY STOK_ADI, YIL, AY
-                ORDER BY YIL, AY;
-            `;
-            const salesResult = await request.query(salesQuery);
-
-            if (salesResult.recordset.length > 0) {
-                const labels = [];
-                const eskiUrunData = [];
-                const yeniUrunData = [];
-                const salesMap = new Map();
-                salesResult.recordset.forEach(r => {
-                    const key = `${r.YIL}-${String(r.AY).padStart(2, '0')}`;
-                    if(!salesMap.has(key)) salesMap.set(key, {});
-                    salesMap.get(key)[r.STOK_ADI] = r.ToplamMiktar;
-                });
-
-                for (let y = 2024; y <= 2025; y++) {
-                    for (let m = 1; m <= 12; m++) {
-                        const key = `${y}-${String(m).padStart(2, '0')}`;
-                        labels.push(`${key}-01`);
-                        eskiUrunData.push(salesMap.get(key)?.[eski_urun] || 0);
-                        yeniUrunData.push(salesMap.get(key)?.[yeni_urun] || 0);
-                    }
-                }
-                chartData = { labels, eskiUrunData, yeniUrunData, lansmanTarihi };
-            }
-        }
-
-        res.render('urun-kanibalizasyon', {
-            sayfaBasligi: 'Ürün Kanibalizasyon Analizi',
-            urunler,
-            chartData,
-            filtreler: { eski_urun, yeni_urun }
-        });
-    } catch (err) {
-        console.error("Hata - Ürün Kanibalizasyon: ", err);
-        res.status(500).send('Hata oluştu');
-    }
-});
-
 
 // === GELİŞTİRİCİ ARAÇLARI ===
 app.get('/ham-veri', async (req, res) => {

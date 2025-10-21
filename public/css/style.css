@@ -151,10 +151,7 @@ h1 {
     width: 160px;
 }
 
-/* DÜZENLEME: Butonlar artık form-actions içinde olduğu için genel button tanımını kaldırıyoruz */
-
-
-.reset-button, button[type="submit"] { /* İki butonu da kapsayacak şekilde birleştirildi */
+.reset-button, button[type="submit"] { 
     background-color: #95a5a6;
     color: white !important;
     padding: 0.65rem 1rem;

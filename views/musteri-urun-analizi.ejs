@@ -1,0 +1,250 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar') %>
+
+<main class="main-content">
+    <h1>
+        <i class="fa-solid fa-box-open"></i> Müşteri Ürün Analizi
+        <%# YENİ EKLENEN PDF BUTONU %>
+        <button onclick="window.print()" class="print-button">
+            <i class="fa-solid fa-file-pdf"></i> PDF Olarak Kaydet
+        </button>
+    </h1>
+    <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
+        Bir müşterinin, seçilen filtrelere göre hangi ürünleri satın aldığını listeler.
+    </p>
+
+    <form action="/musteri-urun-analizi" method="GET" class="filter-form">
+        
+        <div class="form-group" style="flex-grow: 2;">
+            <label for="musteri">Müşteri (Zorunlu)</label>
+            <select name="musteri" id="musteri" required>
+                <option value="">Lütfen bir müşteri seçin...</option>
+                <% if (musteriler) { musteriler.forEach(m => { %>
+                    <option value="<%= m.FIRMAADI %>" <%= (filtreler.musteri === m.FIRMAADI) ? 'selected' : '' %>>
+                        <%= m.FIRMAADI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="yil">Yıl</label>
+            <select name="yil" id="yil">
+                <option value="">Tümü</option>
+                <option value="2024" <%= (filtreler.yil == '2024') ? 'selected' : '' %>>2024</option>
+                <option value="2025" <%= (filtreler.yil == '2025') ? 'selected' : '' %>>2025</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="ay">Ay</label>
+            <select name="ay" id="ay">
+                <option value="">Tümü</option>
+                <% for(let i=1; i<=12; i++) { %>
+                    <option value="<%= i %>" <%= (filtreler.ay == i) ? 'selected' : '' %>><%= i %>. Ay</option>
+                <% } %>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="temsilci">Satış Temsilcisi</label>
+            <select name="temsilci" id="temsilci">
+                <option value="">Tümü</option>
+                <% if (temsilciler) { temsilciler.forEach(t => { %>
+                    <option value="<%= t.SATISTEMSILCI %>" <%= (filtreler.temsilci === t.SATISTEMSILCI) ? 'selected' : '' %>>
+                        <%= t.SATISTEMSILCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="tedarikci">Tedarikçi</label>
+            <select name="tedarikci" id="tedarikci">
+                <option value="">Tümü</option>
+                <% if (tedarikciler) { tedarikciler.forEach(t => { %>
+                    <option value="<%= t.TEDARIKCI %>" <%= (filtreler.tedarikci === t.TEDARIKCI) ? 'selected' : '' %>>
+                        <%= t.TEDARIKCI %>
+                    </option>
+                <% }) } %>
+            </select>
+        </div>
+
+        <div class="form-group" style="flex-grow: 1.5;">
+            <label for="urun">Ürün</label>
+            <select name="urun" id="urun">
+                <option value="">Tümü</option>
+                 <% if (urunler) { urunler.forEach(u => { %>
+                    <option value="<%= u.STOK_ADI %>" <%= (filtreler.urun === u.STOK_ADI) ? 'selected' : '' %>><%= u.STOK_ADI %></option>
+                <% }) } %>
+            </select>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit">Analiz Et</button>
+            <a href="/musteri-urun-analizi" class="reset-button">Sıfırla</a>
+        </div>
+    </form>
+
+    <% if (sonuclar) { %>
+        <% if (sonuclar.length > 0) { %>
+            <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="kpi-card">
+                    <div class="icon"><i class="fa-solid fa-coins"></i></div>
+                    <div class="info">
+                        <h3>Toplam Ciro</h3>
+                        <div class="value"><%= kpis.toplamCiro.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></div>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="icon"><i class="fa-solid fa-box-open"></i></div>
+                    <div class="info">
+                        <h3>Toplam Adet</h3>
+                        <div class="value"><%= kpis.toplamAdet.toLocaleString('tr-TR') %></div>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="icon"><i class="fa-solid fa-bottle-droplet"></i></div>
+                    <div class="info">
+                        <h3>Toplam Litre</h3>
+                        <div class="value"><%= kpis.toplamLitre.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> L</div>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="icon"><i class="fa-solid fa-tags"></i></div>
+                    <div class="info">
+                        <h3>Ürün Çeşidi</h3>
+                        <div class="value"><%= kpis.urunCesidi %></div>
+                    </div>
+                </div>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sıra</th>
+                        <th>Ürün Adı</th>
+                        <th>Toplam Net Tutar</th>
+                        <th>Toplam Net Adet</th>
+                        <th>Toplam Net Litre</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% sonuclar.forEach((s, index) => { %>
+                        <tr>
+                            <td><%= index + 1 %></td>
+                            <td><%= s.STOK_ADI %></td>
+                            <td class="sayisal"><%= s.ToplamTutar.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }) %></td>
+                            <td class="sayisal"><%= s.ToplamAdet.toLocaleString('tr-TR') %></td>
+                            <td class="sayisal"><%= s.ToplamLitre.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) %> L</td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        <% } else { %>
+            <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+                <p>Seçilen müşteri için bu filtrelere uygun satış verisi bulunamadı.</p>
+            </div>
+        <% } %>
+    <% } else { %>
+        <div class="info-box" style="background: #fff; padding: 2rem; border-radius: 8px; text-align: center;">
+            <p>Lütfen bir müşteri seçerek analize başlayın.</p>
+        </div>
+    <% } %>
+</main>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const yilSelect = document.getElementById('yil');
+        const aySelect = document.getElementById('ay');
+        const temsilciSelect = document.getElementById('temsilci');
+        const tedarikciSelect = document.getElementById('tedarikci');
+        const musteriSelect = document.getElementById('musteri');
+        const urunSelect = document.getElementById('urun');
+
+        const seciliMusteri = musteriSelect.value;
+        const seciliUrun = urunSelect.value;
+
+        // Temsilci, Yıl veya Ay değiştikçe Müşteri listesini güncelleyelim
+        async function guncelleMusteriler() {
+            const yil = yilSelect.value;
+            const ay = aySelect.value;
+            const temsilci = temsilciSelect.value;
+            
+            musteriSelect.disabled = true;
+            musteriSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+            try {
+                const response = await fetch(`/api/musteriler?yil=${yil}&ay=${ay}&temsilci=${encodeURIComponent(temsilci)}`);
+                if (!response.ok) throw new Error('Sunucu hatası');
+                
+                const musteriler = await response.json();
+                musteriSelect.innerHTML = '<option value="">Lütfen bir müşteri seçin...</option>';
+                
+                let seciliMusteriHalaListede = false;
+                musteriler.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m.FIRMAADI;
+                    option.textContent = m.FIRMAADI;
+                    if (m.FIRMAADI === seciliMusteri) {
+                        option.selected = true;
+                        seciliMusteriHalaListede = true;
+                    }
+                    musteriSelect.appendChild(option);
+                });
+                if (!seciliMusteriHalaListede) {
+                    musteriSelect.value = "";
+                }
+            } catch (error) {
+                console.error('Müşteriler güncellenirken hata oluştu:', error);
+                musteriSelect.innerHTML = '<option value="">Müşteriler yüklenemedi!</option>';
+            } finally {
+                musteriSelect.disabled = false;
+            }
+        }
+
+        // Temsilci veya Tedarikçi değiştikçe Ürün listesini güncelleyelim
+        async function guncelleUrunler() {
+            const tedarikci = tedarikciSelect.value;
+            const temsilci = temsilciSelect.value;
+
+            urunSelect.disabled = true;
+            urunSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+            try {
+                const response = await fetch(`/api/urunler?tedarikci=${encodeURIComponent(tedarikci)}&temsilci=${encodeURIComponent(temsilci)}`);
+                if (!response.ok) throw new Error('Sunucu hatası');
+                
+                const urunler = await response.json();
+                urunSelect.innerHTML = '<option value="">Tümü</option>';
+                
+                let seciliUrunHalaListede = false;
+                urunler.forEach(u => {
+                    const option = document.createElement('option');
+                    option.value = u.STOK_ADI;
+                    option.textContent = u.STOK_ADI;
+                    if (u.STOK_ADI === seciliUrun) {
+                        option.selected = true;
+                        seciliUrunHalaListede = true;
+                    }
+                    urunSelect.appendChild(option);
+                 });
+                 if (!seciliUrunHalaListede) {
+                    urunSelect.value = "";
+                 }
+            } catch (error) {
+                console.error('Ürünler güncellenirken hata oluştu:', error);
+                urunSelect.innerHTML = '<option value="">Ürünler yüklenemedi!</option>';
+            } finally {
+                urunSelect.disabled = false;
+            }
+        }
+
+        yilSelect.addEventListener('change', guncelleMusteriler);
+        aySelect.addEventListener('change', guncelleMusteriler);
+        temsilciSelect.addEventListener('change', guncelleMusteriler);
+        
+        temsilciSelect.addEventListener('change', guncelleUrunler);
+        tedarikciSelect.addEventListener('change', guncelleUrunler);
+    });
+</script>
+
+<%- include('partials/footer') %>

@@ -16,7 +16,7 @@ const dbConfig = {
         encrypt: false,
         trustServerCertificate: true
     },
-    requestTimeout: 60000 
+    requestTimeout: 60000 // Kayıp Müşteri Timeout hatası alırsanız burayı artırabilirsiniz (örn: 120000)
 };
 
 // NET HESAPLAMA SABİTLERİ
@@ -27,16 +27,17 @@ const NET_TUTAR_ANAVERI = "(CASE WHEN AnaVeri.FIS_TURU IN (23, 102) THEN -AnaVer
 const NET_MIKTAR_ANAVERI = "(CASE WHEN AnaVeri.FIS_TURU IN (23, 102) THEN -AnaVeri.MIKTAR ELSE AnaVeri.MIKTAR END)";
 const NET_LITRE_ANAVERI = "(CASE WHEN AnaVeri.FIS_TURU IN (23, 102) THEN -AnaVeri.SATIS_MIKTAR_LITRE ELSE AnaVeri.SATIS_MIKTAR_LITRE END)";
 
-const KARLILIK_HESAPLAMA_CTE = `
-WITH IslemBazindaMaliyet AS (
-    SELECT 
+// DÜZELTİLDİ: Başındaki WITH kaldırıldı ve isim değişti
+const KARLILIK_HESAPLAMA_CTES_DEF = `
+IslemBazindaMaliyet AS (
+    SELECT
         TARIH,
         FIRMAADI,
         STOK_KODU,
-        (CASE 
-            WHEN SUM(CASE WHEN FIS_TURU IN (23, 102) THEN -MIKTAR ELSE MIKTAR END) > 0 
+        (CASE
+            WHEN SUM(CASE WHEN FIS_TURU IN (23, 102) THEN -MIKTAR ELSE MIKTAR END) > 0
             THEN SUM((CASE WHEN FIS_TURU IN (23, 102) THEN -MIKTAR ELSE MIKTAR END) * COALESCE(MALIYET, ALISFIYATI, 0)) / SUM(CASE WHEN FIS_TURU IN (23, 102) THEN -MIKTAR ELSE MIKTAR END)
-            ELSE 0 
+            ELSE 0
         END) AS IslemOrtalamaMaliyeti
     FROM YC_SATIS_DETAY_TUMU
     GROUP BY TARIH, FIRMAADI, STOK_KODU
@@ -57,32 +58,32 @@ AnaVeri AS (
             güm.GenelGecerliMaliyet,
             0
         ) AS DogruBirimMaliyet
-    FROM 
+    FROM
         YC_SATIS_DETAY_TUMU s
-    LEFT JOIN 
+    LEFT JOIN
         IslemBazindaMaliyet ibm ON s.TARIH = ibm.TARIH AND s.FIRMAADI = ibm.FIRMAADI AND s.STOK_KODU = ibm.STOK_KODU
     LEFT JOIN
         GenelUrunMaliyeti güm ON s.STOK_KODU = güm.STOK_KODU
 )
 `;
 const BASE_WHERE_CLAUSE_SIMPLE = `
-    YIL IN (2024, 2025) 
-    AND STOK_ADI <> 'HİZMET' 
+    YIL IN (2024, 2025)
+    AND STOK_ADI <> 'HİZMET'
     AND TEDARIKCI <> 'GENEL HARCAMA'
 `;
 const BASE_WHERE_CLAUSE_PREFIXED = `
-    s.YIL IN (2024, 2025) 
-    AND s.STOK_ADI <> 'HİZMET' 
+    s.YIL IN (2024, 2025)
+    AND s.STOK_ADI <> 'HİZMET'
     AND s.TEDARIKCI <> 'GENEL HARCAMA'
 `;
 const GUNCEL_URUNLER_SUBQUERY = `
     (
         SELECT STOK_KODU, STOK_ADI FROM (
-            SELECT 
-                STOK_KODU, 
-                STOK_ADI, 
+            SELECT
+                STOK_KODU,
+                STOK_ADI,
                 ROW_NUMBER() OVER(PARTITION BY STOK_KODU ORDER BY TARIH DESC) as rn
-            FROM YC_SATIS_DETAY_TUMU 
+            FROM YC_SATIS_DETAY_TUMU
             WHERE STOK_KODU IS NOT NULL AND STOK_KODU <> ''
         ) AS UrunMaster WHERE rn = 1
     )
@@ -90,7 +91,7 @@ const GUNCEL_URUNLER_SUBQUERY = `
 
 
 const getDateRange = (period) => {
-    const now = new Date(); 
+    const now = new Date();
     let startDate, endDate;
     switch (period) {
         case 'bu_ay':
@@ -182,7 +183,7 @@ app.get('/sorgula', async (req, res) => {
         }
 
         const queryString = new URLSearchParams(params).toString();
-        
+
         res.redirect(`/urun-kiyaslama?${queryString}`);
 
     } catch (err) {
@@ -212,13 +213,14 @@ app.get('/temsilci-performans', async (req, res) => {
         musteriQuery += ` ORDER BY FIRMAADI`;
         const musteriler = (await musteriRequest.query(musteriQuery)).recordset;
 
+        // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
         let query = `
-            ${KARLILIK_HESAPLAMA_CTE}
-            SELECT 
-                ISNULL(SUM(${NET_TUTAR_ANAVERI}), 0) AS ToplamCiro, 
-                ISNULL(SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)), 0) AS ToplamKar, 
-                COUNT(DISTINCT AnaVeri.FIRMAADI) AS MusteriSayisi 
-            FROM AnaVeri 
+            WITH ${KARLILIK_HESAPLAMA_CTES_DEF}
+            SELECT
+                ISNULL(SUM(${NET_TUTAR_ANAVERI}), 0) AS ToplamCiro,
+                ISNULL(SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)), 0) AS ToplamKar,
+                COUNT(DISTINCT AnaVeri.FIRMAADI) AS MusteriSayisi
+            FROM AnaVeri
             WHERE YIL IN (2024, 2025) AND STOK_ADI <> 'HİZMET' AND TEDARIKCI <> 'GENEL HARCAMA'
         `;
         const request = pool.request();
@@ -232,16 +234,16 @@ app.get('/temsilci-performans', async (req, res) => {
         } else if (fis_turu === 'market') {
             query += ` AND FIS_TURU IN (101, 102)`;
         }
-        
+
         const result = await request.query(query);
 
-        res.render('temsilci-performans', { 
-            sayfaBasligi: 'Temsilci Performans Raporu', 
-            temsilciler, 
-            musteriler, 
+        res.render('temsilci-performans', {
+            sayfaBasligi: 'Temsilci Performans Raporu',
+            temsilciler,
+            musteriler,
             tedarikciler,
-            sonuc: result.recordset[0], 
-            filtreler: { yil, ay, temsilci, musteri, tedarikci, fis_turu } 
+            sonuc: result.recordset[0],
+            filtreler: { yil, ay, temsilci, musteri, tedarikci, fis_turu }
         });
     } catch (err) { console.error("Hata - Temsilci Performansı: ", err); res.status(500).send('Hata oluştu'); }
 });
@@ -256,13 +258,13 @@ const getTopNProducts = async (n, filtreler) => {
     if (urun_grubu) { whereClauses += ' AND s.URUN_GRUBU = @urunGrubuParam'; request.input('urunGrubuParam', sql.NVarChar, urun_grubu); }
     if (baslangicTarihi) { whereClauses += ' AND s.TARIH >= @baslangicParam'; request.input('baslangicParam', sql.Date, baslangicTarihi); }
     if (bitisTarihi) { whereClauses += ' AND s.TARIH <= @bitisParam'; request.input('bitisParam', sql.Date, bitisTarihi); }
-    
+
     if (fis_turu === 'toptan') {
         whereClauses += ` AND s.FIS_TURU IN (21, 23)`;
     } else if (fis_turu === 'market') {
         whereClauses += ` AND s.FIS_TURU IN (101, 102)`;
     }
-    
+
     const query = `
         SELECT TOP ${n}
             s.STOK_ADI,
@@ -282,7 +284,7 @@ app.get('/top-5-satis', async (req, res) => {
     try {
         const { tedarikciler } = await getFilterData(['tedarikciler']);
         const sonuclar = await getTopNProducts(5, req.query);
-        
+
         const pool = await poolPromise;
         let urunGruplariQuery = 'SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY_TUMU WHERE URUN_GRUBU IS NOT NULL';
         const ugRequest = pool.request();
@@ -315,7 +317,7 @@ app.get('/top-10-satis', async (req, res) => {
     try {
         const { tedarikciler } = await getFilterData(['tedarikciler']);
         const sonuclar = await getTopNProducts(10, req.query);
-        
+
         const pool = await poolPromise;
         let urunGruplariQuery = 'SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY_TUMU WHERE URUN_GRUBU IS NOT NULL';
         const ugRequest = pool.request();
@@ -344,26 +346,116 @@ app.get('/top-10-satis', async (req, res) => {
     }
 });
 
+app.get('/musteri-urun-analizi', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { musteri, tedarikci, yil, ay, temsilci, urun } = req.query;
+
+        // Statik filtre verilerini çek
+        const { tedarikciler, temsilciler } = await getFilterData(['tedarikciler', 'temsilciler']);
+
+        // Dinamik Müşteri listesini çek (Temsilci, Yıl, Ay'a göre)
+        let musteriQuery = `SELECT DISTINCT FIRMAADI FROM YC_SATIS_DETAY_TUMU WHERE ${BASE_WHERE_CLAUSE_SIMPLE}`;
+        const musteriRequest = pool.request();
+        if (yil) { musteriQuery += ` AND YIL = @yilParam`; musteriRequest.input('yilParam', sql.Int, yil); }
+        if (ay) { musteriQuery += ` AND AY = @ayParam`; musteriRequest.input('ayParam', sql.Int, ay); }
+        if (temsilci) { musteriQuery += ` AND SATISTEMSILCI = @temsilciParam`; musteriRequest.input('temsilciParam', sql.NVarChar, temsilci); }
+        musteriQuery += ` ORDER BY FIRMAADI`;
+        const musteriler = (await musteriRequest.query(musteriQuery)).recordset;
+
+        // Dinamik Ürün listesini çek (Temsilci, Tedarikçi'ye göre)
+        let urunlerQuery = `
+            SELECT DISTINCT gu.STOK_ADI
+            FROM YC_SATIS_DETAY_TUMU s
+            JOIN ${GUNCEL_URUNLER_SUBQUERY} gu ON s.STOK_KODU = gu.STOK_KODU
+            WHERE ${BASE_WHERE_CLAUSE_PREFIXED}
+        `;
+        const urunlerRequest = pool.request();
+        if (temsilci) { urunlerQuery += ` AND s.SATISTEMSILCI = @temsilciParam`; urunlerRequest.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (tedarikci) { urunlerQuery += ` AND s.TEDARIKCI = @tedarikciParam`; urunlerRequest.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        urunlerQuery += ` ORDER BY gu.STOK_ADI`;
+        const urunler = (await urunlerRequest.query(urunlerQuery)).recordset;
+
+        let sonuclar = null;
+        let kpis = null;
+
+        // Ana sorgu sadece müşteri seçildiyse çalışsın
+        if (musteri) {
+            let query = `
+                SELECT
+                    s.STOK_ADI,
+                    ISNULL(SUM(${NET_TUTAR}), 0) as ToplamTutar,
+                    ISNULL(SUM(${NET_MIKTAR}), 0) as ToplamAdet,
+                    ISNULL(SUM(${NET_LITRE}), 0) as ToplamLitre
+                FROM YC_SATIS_DETAY_TUMU s
+                WHERE ${BASE_WHERE_CLAUSE_PREFIXED} AND s.FIRMAADI = @musteriParam
+            `;
+
+            const request = pool.request();
+            request.input('musteriParam', sql.NVarChar, musteri);
+
+            if (yil) { query += ` AND s.YIL = @yilParam`; request.input('yilParam', sql.Int, yil); }
+            if (ay) { query += ` AND s.AY = @ayParam`; request.input('ayParam', sql.Int, ay); }
+            if (temsilci) { query += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+            if (tedarikci) { query += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+            if (urun) { query += ` AND s.STOK_ADI = @urunParam`; request.input('urunParam', sql.NVarChar, urun); }
+
+            query += ` GROUP BY s.STOK_ADI ORDER BY ToplamTutar DESC`;
+
+            const result = await request.query(query);
+            sonuclar = result.recordset;
+
+            // KPI'ları hesapla
+            if (sonuclar.length > 0) {
+                kpis = {
+                    toplamCiro: sonuclar.reduce((sum, s) => sum + s.ToplamTutar, 0),
+                    toplamAdet: sonuclar.reduce((sum, s) => sum + s.ToplamAdet, 0),
+                    toplamLitre: sonuclar.reduce((sum, s) => sum + s.ToplamLitre, 0),
+                    urunCesidi: sonuclar.length
+                };
+            } else {
+                 kpis = { toplamCiro: 0, toplamAdet: 0, toplamLitre: 0, urunCesidi: 0 };
+            }
+        }
+
+        res.render('musteri-urun-analizi', {
+            sayfaBasligi: 'Müşteri Ürün Analizi',
+            filtreler: req.query,
+            musteriler,
+            tedarikciler,
+            temsilciler,
+            urunler,
+            sonuclar,
+            kpis
+        });
+
+    } catch (err) {
+        console.error("Hata - Müşteri Ürün Analizi: ", err);
+        res.status(500).send('Hata oluştu');
+    }
+});
+
 
 // === KARLILIK RAPORLARI ===
 app.get('/urun-karlilik', async (req, res) => {
     try {
         const pool = await poolPromise;
+        // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
         const query = `
-            ${KARLILIK_HESAPLAMA_CTE}
-            SELECT 
-                s.STOK_ADI, 
-                SUM(${NET_TUTAR}) AS ToplamCiro, 
-                SUM((${NET_TUTAR}) - ((${NET_MIKTAR}) * s.DogruBirimMaliyet)) AS ToplamKar
-            FROM AnaVeri s
-            WHERE 
-                s.YIL = 2025 
-                AND s.TEDARIKCI = 'ALİ ERTAN CO LTD'
-                AND s.STOK_ADI <> 'HİZMET' 
-            GROUP BY s.STOK_ADI 
+            WITH ${KARLILIK_HESAPLAMA_CTES_DEF}
+            SELECT
+                AnaVeri.STOK_ADI,
+                SUM(${NET_TUTAR_ANAVERI}) AS ToplamCiro,
+                SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * AnaVeri.DogruBirimMaliyet)) AS ToplamKar
+            FROM AnaVeri
+            WHERE
+                AnaVeri.YIL = 2025
+                AND AnaVeri.TEDARIKCI = 'ALİ ERTAN CO LTD'
+                AND AnaVeri.STOK_ADI <> 'HİZMET'
+            GROUP BY AnaVeri.STOK_ADI
             ORDER BY ToplamKar DESC
         `;
-        
+
         const result = await pool.request().query(query);
         const sonuclar = result.recordset;
 
@@ -377,9 +469,9 @@ app.get('/urun-karlilik', async (req, res) => {
             }
         }
 
-        res.render('urun-karlilik', { 
-            sayfaBasligi: 'Ürün Karlılık Analizi', 
-            sonuclar: sonuclar, 
+        res.render('urun-karlilik', {
+            sayfaBasligi: 'Ürün Karlılık Analizi',
+            sonuclar: sonuclar,
             kpis: kpis
         });
     } catch (err) { console.error("Hata - Ürün Karlılığı: ", err); res.status(500).send('Hata oluştu'); }
@@ -399,7 +491,7 @@ app.get('/karlilik-marji-analizi', async (req, res) => {
                 bitisTarihi = range.endDate;
             }
         }
-        
+
         let groupByColumn = '';
         switch(gruplama) {
             case 'musteri': groupByColumn = 'FIRMAADI'; break;
@@ -408,17 +500,19 @@ app.get('/karlilik-marji-analizi', async (req, res) => {
         }
 
         const request = pool.request();
-        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')}`;
-        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
-        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+        // DÜZELTİLDİ: WHERE clause AnaVeri prefixi ile güncellendi
+        let whereClauses = `WHERE AnaVeri.STOK_ADI <> 'HİZMET' AND AnaVeri.TEDARIKCI <> 'GENEL HARCAMA'`;
+        if (baslangicTarihi) { whereClauses += ` AND AnaVeri.TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+        if (bitisTarihi) { whereClauses += ` AND AnaVeri.TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
 
+        // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
         const marginQuery = `
-            ${KARLILIK_HESAPLAMA_CTE}
+            WITH ${KARLILIK_HESAPLAMA_CTES_DEF}
             SELECT
                 ${groupByColumn},
                 SUM(${NET_TUTAR_ANAVERI}) as ToplamCiro,
                 SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)) as ToplamKar,
-                CASE 
+                CASE
                     WHEN SUM(${NET_TUTAR_ANAVERI}) = 0 THEN 0
                     ELSE (SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)) * 100.0) / SUM(${NET_TUTAR_ANAVERI})
                 END as KarMarji
@@ -430,7 +524,7 @@ app.get('/karlilik-marji-analizi', async (req, res) => {
         `;
 
         const result = await request.query(marginQuery);
-        
+
         res.render('karlilik-marji-analizi', {
             sayfaBasligi: 'Kârlılık Marjı Analizi',
             sonuclar: result.recordset,
@@ -461,34 +555,35 @@ app.get('/temsilci-kiyaslama', async (req, res) => {
 
         const getTemsilciData = async (temsilciAdi) => {
             if (!temsilciAdi) return null;
+            // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
             let query = `
-                ${KARLILIK_HESAPLAMA_CTE}
-                SELECT 
-                    ISNULL(SUM(${NET_TUTAR_ANAVERI}), 0) AS ToplamCiro, 
-                    ISNULL(SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)), 0) AS ToplamKar, 
-                    COUNT(DISTINCT AnaVeri.FIRMAADI) AS MusteriSayisi, 
-                    ISNULL(SUM(${NET_MIKTAR_ANAVERI}), 0) AS ToplamMiktar, 
+                WITH ${KARLILIK_HESAPLAMA_CTES_DEF}
+                SELECT
+                    ISNULL(SUM(${NET_TUTAR_ANAVERI}), 0) AS ToplamCiro,
+                    ISNULL(SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)), 0) AS ToplamKar,
+                    COUNT(DISTINCT AnaVeri.FIRMAADI) AS MusteriSayisi,
+                    ISNULL(SUM(${NET_MIKTAR_ANAVERI}), 0) AS ToplamMiktar,
                     ISNULL(SUM(${NET_LITRE_ANAVERI}), 0) AS ToplamLitre
-                FROM AnaVeri 
-                WHERE YIL IN (2024, 2025) AND STOK_ADI <> 'HİZMET' AND TEDARIKCI <> 'GENEL HARCAMA'
-                AND SATISTEMSILCI = @temsilciParam
+                FROM AnaVeri
+                WHERE AnaVeri.STOK_ADI <> 'HİZMET' AND AnaVeri.TEDARIKCI <> 'GENEL HARCAMA'
+                AND AnaVeri.SATISTEMSILCI = @temsilciParam
             `;
             const request = pool.request();
             request.input('temsilciParam', sql.NVarChar, temsilciAdi);
-            if (baslangicTarihi) { query += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
-            if (bitisTarihi) { query += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
-            if (tedarikci) { query += ` AND TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
-            if (kategori) { query += ` AND KATEGORI = @kategoriParam`; request.input('kategoriParam', sql.NVarChar, kategori); }
+            if (baslangicTarihi) { query += ` AND AnaVeri.TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+            if (bitisTarihi) { query += ` AND AnaVeri.TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+            if (tedarikci) { query += ` AND AnaVeri.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+            if (kategori) { query += ` AND AnaVeri.KATEGORI = @kategoriParam`; request.input('kategoriParam', sql.NVarChar, kategori); }
             const result = await request.query(query);
             return result.recordset[0];
         };
         const [sonuc1, sonuc2] = await Promise.all([getTemsilciData(temsilci1), getTemsilciData(temsilci2)]);
 
-        res.render('temsilci-kiyaslama', { 
-            sayfaBasligi: 'Temsilci Kıyaslama Paneli', 
+        res.render('temsilci-kiyaslama', {
+            sayfaBasligi: 'Temsilci Kıyaslama Paneli',
             temsilciler, tedarikciler, kategoriler,
-            sonuc1, sonuc2, 
-            filtreler: { temsilci1, temsilci2, baslangicTarihi, bitisTarihi, tedarikci, kategori, zamanAraligi } 
+            sonuc1, sonuc2,
+            filtreler: { temsilci1, temsilci2, baslangicTarihi, bitisTarihi, tedarikci, kategori, zamanAraligi }
         });
     } catch (err) { console.error("Hata - Temsilci Kıyaslama: ", err); res.status(500).send('Hata oluştu'); }
 });
@@ -499,7 +594,7 @@ app.get('/urun-kiyaslama', async (req, res) => {
         const { urun_grubu, urun, temsilci, tedarikci, metrik = 'adet', fis_turu } = req.query;
 
         const { temsilciler, tedarikciler } = await getFilterData(['temsilciler', 'tedarikciler']);
-        
+
         let urunGruplariQuery = `SELECT DISTINCT URUN_GRUBU FROM YC_SATIS_DETAY_TUMU WHERE URUN_GRUBU IS NOT NULL`;
         const urunGruplariRequest = pool.request();
         if (temsilci) { urunGruplariQuery += ` AND SATISTEMSILCI = @temsilciParam`; urunGruplariRequest.input('temsilciParam', sql.NVarChar, temsilci); }
@@ -514,7 +609,7 @@ app.get('/urun-kiyaslama', async (req, res) => {
         if (urun_grubu) { urunlerQuery += ` AND URUN_GRUBU = @urunGrubuParam`; urunlerRequest.input('urunGrubuParam', sql.NVarChar, urun_grubu); }
         urunlerQuery += ` ORDER BY STOK_ADI`;
         const urunler = (await urunlerRequest.query(urunlerQuery)).recordset;
-        
+
         let sonuclar = [];
         if (urun_grubu || urun) {
             let aggregationColumn;
@@ -533,9 +628,9 @@ app.get('/urun-kiyaslama', async (req, res) => {
                     SUM(CASE WHEN s.YIL = 2024 THEN ${aggregationColumn} ELSE 0 END) as miktar2024,
                     SUM(CASE WHEN s.YIL = 2025 THEN ${aggregationColumn} ELSE 0 END) as miktar2025
                 FROM YC_SATIS_DETAY_TUMU s
-                WHERE ${BASE_WHERE_CLAUSE_PREFIXED} 
+                WHERE ${BASE_WHERE_CLAUSE_PREFIXED}
             `;
-            
+
             if (urun) {
                 query += ` AND s.STOK_ADI = @urunParam`;
                 request.input('urunParam', sql.NVarChar, urun);
@@ -543,10 +638,10 @@ app.get('/urun-kiyaslama', async (req, res) => {
                 query += ` AND s.URUN_GRUBU = @urunGrubuParam`;
                 request.input('urunGrubuParam', sql.NVarChar, urun_grubu);
             }
-            
+
             if (temsilci) { query += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
             if (tedarikci) { query += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
-            
+
             if (fis_turu === 'toptan') {
                 query += ` AND s.FIS_TURU IN (21, 23)`;
             } else if (fis_turu === 'market') {
@@ -554,9 +649,9 @@ app.get('/urun-kiyaslama', async (req, res) => {
             }
 
             query += ` GROUP BY s.AY ORDER BY s.AY`;
-            
+
             const result = await request.query(query);
-            
+
             const resultData = result.recordset;
             const ayIsimleri = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
             for (let i = 1; i <= 12; i++) {
@@ -572,10 +667,10 @@ app.get('/urun-kiyaslama', async (req, res) => {
             sayfaBasligi: 'Yıllık Kıyaslama Raporu',
             urunGruplari,
             urunler,
-            temsilciler, 
+            temsilciler,
             tedarikciler,
             sonuclar,
-            filtreler: { urun_grubu, urun, temsilci, tedarikci, metrik, fis_turu } 
+            filtreler: { urun_grubu, urun, temsilci, tedarikci, metrik, fis_turu }
         });
     } catch (err) {
         console.error("Hata - Ürün Kıyaslama: ", err);
@@ -583,32 +678,35 @@ app.get('/urun-kiyaslama', async (req, res) => {
     }
 });
 
-// YENİ EKLENEN RAPOR: TEDARİKCİ KATEGORİ KIYASLAMA
 app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
     try {
-        const { tedarikci, metrik = 'tutar' } = req.query; // Metrik filtresi eklendi
+        const { tedarikci, metrik = 'tutar' } = req.query;
         const { tedarikciler } = await getFilterData(['tedarikciler']);
-        
+
         let sonuclar = [];
         if (tedarikci) {
             const pool = await poolPromise;
             const request = pool.request();
             request.input('tedarikciParam', sql.NVarChar, tedarikci);
-            
+
             let aggregationColumn2024;
             let aggregationColumn2025;
+            let aggregationColumnName;
 
             if (metrik === 'adet') {
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_MIKTAR} ELSE 0 END), 0) as Metrik2024`;
                 aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_MIKTAR} ELSE 0 END), 0) as Metrik2025`;
+                aggregationColumnName = 'Miktar';
             } else if (metrik === 'litre') {
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2024`;
                 aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2025`;
-            } else { // Tutar varsayılan
+                aggregationColumnName = 'Litre';
+            } else {
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2024`;
                 aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2025`;
+                aggregationColumnName = 'Tutar';
             }
-            
+
             const query = `
                 SELECT
                     s.KATEGORI,
@@ -617,7 +715,7 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
                     ${aggregationColumn2024},
                     ${aggregationColumn2025}
                 FROM YC_SATIS_DETAY_TUMU s
-                WHERE 
+                WHERE
                     s.TEDARIKCI = @tedarikciParam
                     AND s.YIL IN (2024, 2025)
                     AND s.FIS_TURU IN (101, 102) -- Sadece Market Satışları
@@ -626,9 +724,9 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
                 GROUP BY s.KATEGORI, s.URUN_GRUBU, s.AY
                 ORDER BY s.KATEGORI, s.URUN_GRUBU, s.AY;
             `;
-            
+
             const result = await request.query(query);
-            
+
             const ayIsimleri = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
             const kategoriMap = new Map();
 
@@ -649,7 +747,7 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
                         Metrik2024: 0,
                         Metrik2025: 0
                     }));
-                    
+
                     kategori.urunGrubuMap.set(satir.URUN_GRUBU, {
                         URUN_GRUBU: satir.URUN_GRUBU,
                         Toplam2024: 0,
@@ -694,13 +792,16 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
 app.get('/aylik-trend', async (req, res) => {
     try {
         const pool = await poolPromise;
+        // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
         const result = await pool.request().query(`
-            ${KARLILIK_HESAPLAMA_CTE}
-            SELECT YIL, AY, 
-                SUM(${NET_TUTAR_ANAVERI}) as ToplamCiro, 
+            WITH ${KARLILIK_HESAPLAMA_CTES_DEF}
+            SELECT YIL, AY,
+                SUM(${NET_TUTAR_ANAVERI}) as ToplamCiro,
                 SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)) as ToplamKar
-            FROM AnaVeri 
-            WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('s.', 'AnaVeri.')}
+            FROM AnaVeri
+            WHERE AnaVeri.YIL IN (2024, 2025)
+                AND AnaVeri.STOK_ADI <> 'HİZMET'
+                AND AnaVeri.TEDARIKCI <> 'GENEL HARCAMA'
             GROUP BY YIL, AY ORDER BY YIL, AY
         `);
         res.render('aylik-trend', { sayfaBasligi: 'Aylık Ciro ve Kârlılık Trendi', sonuclar: result.recordset });
@@ -713,11 +814,11 @@ app.get('/urun-potansiyeli', async (req, res) => {
         const pool = await poolPromise;
         const { musteri, temsilci, tedarikci, kategori } = req.query;
         const { musteriler, temsilciler, tedarikciler: tedarikcilerDB, kategoriler } = await getFilterData(['musteriler', 'temsilciler', 'tedarikciler', 'kategoriler']);
-        
+
         let sonuclar = { satinAlinan: [], potansiyel: [] };
         if (musteri) {
             let allProductsQuery = `
-                SELECT DISTINCT gu.STOK_ADI 
+                SELECT DISTINCT gu.STOK_ADI
                 FROM YC_SATIS_DETAY_TUMU s
                 JOIN ${GUNCEL_URUNLER_SUBQUERY} gu ON s.STOK_KODU = gu.STOK_KODU
                 WHERE ${BASE_WHERE_CLAUSE_PREFIXED} AND (${NET_TUTAR}) > 0
@@ -726,20 +827,20 @@ app.get('/urun-potansiyeli', async (req, res) => {
             if (temsilci) { allProductsQuery += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
             if (tedarikci) { allProductsQuery += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
             if (kategori) { allProductsQuery += ` AND s.KATEGORI = @kategoriParam`; request.input('kategoriParam', sql.NVarChar, kategori); }
-            
+
             const allProductsResult = await request.query(allProductsQuery);
             const allProducts = allProductsResult.recordset.map(p => p.STOK_ADI);
-            
+
             const customerProductsResult = await pool.request()
                 .input('musteriParam', sql.NVarChar, musteri)
                 .query(`
-                    SELECT DISTINCT gu.STOK_ADI 
+                    SELECT DISTINCT gu.STOK_ADI
                     FROM YC_SATIS_DETAY_TUMU s
                     JOIN ${GUNCEL_URUNLER_SUBQUERY} gu ON s.STOK_KODU = gu.STOK_KODU
                     WHERE ${BASE_WHERE_CLAUSE_PREFIXED} AND s.FIRMAADI = @musteriParam AND (${NET_TUTAR}) > 0
                 `);
             const customerProductsSet = new Set(customerProductsResult.recordset.map(p => p.STOK_ADI));
-            
+
             allProducts.forEach(productName => {
                 if (customerProductsSet.has(productName)) {
                     sonuclar.satinAlinan.push(productName);
@@ -770,9 +871,9 @@ app.get('/musteri-potansiyeli', async (req, res) => {
             if (temsilci) { allCustomersQuery += ` AND s.SATISTEMSILCI = @temsilciParam`; request1.input('temsilciParam', sql.NVarChar, temsilci); }
             const allCustomersResult = await request1.query(allCustomersQuery);
             const allCustomers = allCustomersResult.recordset.map(c => c.FIRMAADI);
-            
+
             let productBuyersQuery = `
-                SELECT DISTINCT s.FIRMAADI 
+                SELECT DISTINCT s.FIRMAADI
                 FROM YC_SATIS_DETAY_TUMU s
                 WHERE ${BASE_WHERE_CLAUSE_PREFIXED} AND (${NET_TUTAR}) > 0 AND s.STOK_KODU IN (
                     SELECT STOK_KODU FROM ${GUNCEL_URUNLER_SUBQUERY} AS gu WHERE gu.STOK_ADI = @urunParam
@@ -783,7 +884,7 @@ app.get('/musteri-potansiyeli', async (req, res) => {
             if (temsilci) { productBuyersQuery += ` AND s.SATISTEMSILCI = @temsilciParam`; request2.input('temsilciParam', sql.NVarChar, temsilci); }
             const productBuyersResult = await request2.query(productBuyersQuery);
             const productBuyersSet = new Set(productBuyersResult.recordset.map(c => c.FIRMAADI));
-            
+
             allCustomers.forEach(customerName => {
                 if (productBuyersSet.has(customerName)) {
                     sonuclar.satinAlan.push(customerName);
@@ -821,7 +922,7 @@ app.get('/musteri-kayip-urun', async (req, res) => {
         if (musteri) {
             const createFilteredQueryForCodes = (year) => {
                 let baseQuery = `
-                    SELECT DISTINCT STOK_KODU FROM YC_SATIS_DETAY_TUMU 
+                    SELECT DISTINCT STOK_KODU FROM YC_SATIS_DETAY_TUMU
                     WHERE FIRMAADI = @musteriParam AND YIL = ${year} AND STOK_KODU IS NOT NULL AND STOK_KODU <> ''
                     AND FIS_TURU IN (21, 101)
                 `;
@@ -834,32 +935,32 @@ app.get('/musteri-kayip-urun', async (req, res) => {
             request.input('musteriParam', sql.NVarChar, musteri);
             if (temsilci) request.input('temsilciParam', sql.NVarChar, temsilci);
             if (tedarikci) request.input('tedarikciParam', sql.NVarChar, tedarikci);
-            
+
             const kayipUrunlerQuery = `
-                SELECT gu.STOK_ADI 
-                FROM ${GUNCEL_URUNLER_SUBQUERY} gu 
+                SELECT gu.STOK_ADI
+                FROM ${GUNCEL_URUNLER_SUBQUERY} gu
                 WHERE gu.STOK_KODU IN (
                     SELECT T.STOK_KODU FROM (${createFilteredQueryForCodes(2024)}) AS T
                     EXCEPT
                     SELECT T.STOK_KODU FROM (${createFilteredQueryForCodes(2025)}) AS T
                 )
             `;
-            
+
             const yeniUrunlerQuery = `
-                SELECT gu.STOK_ADI 
-                FROM ${GUNCEL_URUNLER_SUBQUERY} gu 
+                SELECT gu.STOK_ADI
+                FROM ${GUNCEL_URUNLER_SUBQUERY} gu
                 WHERE gu.STOK_KODU IN (
                     SELECT T.STOK_KODU FROM (${createFilteredQueryForCodes(2025)}) AS T
                     EXCEPT
                     SELECT T.STOK_KODU FROM (${createFilteredQueryForCodes(2024)}) AS T
                 )
             `;
-            
+
             const [kayipResult, yeniResult] = await Promise.all([
                 request.query(kayipUrunlerQuery),
                 request.query(yeniUrunlerQuery)
             ]);
-            
+
             sonuclar.kayipUrunler = kayipResult.recordset;
             sonuclar.yeniUrunler = yeniResult.recordset;
         }
@@ -894,18 +995,20 @@ app.get('/musteri-deger-analizi', async (req, res) => {
                 bitisTarihi = range.endDate;
             }
         }
-        
-        let kpis = { toplamCiro: 0, sayiA: 0, sayiB: 0, sayiC: 0 };
-        
-        const request = pool.request();
-        let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('YIL IN (2024, 2025)', '1=1')}`;
-        if (temsilci) { whereClauses += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
-        if (tedarikci) { whereClauses += ` AND TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
-        if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
-        if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
 
+        let kpis = { toplamCiro: 0, sayiA: 0, sayiB: 0, sayiC: 0 };
+
+        const request = pool.request();
+        // DÜZELTİLDİ: WHERE clause AnaVeri prefixi ile güncellendi
+        let whereClauses = `WHERE AnaVeri.STOK_ADI <> 'HİZMET' AND AnaVeri.TEDARIKCI <> 'GENEL HARCAMA'`;
+        if (temsilci) { whereClauses += ` AND AnaVeri.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
+        if (tedarikci) { whereClauses += ` AND AnaVeri.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
+        if (baslangicTarihi) { whereClauses += ` AND AnaVeri.TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
+        if (bitisTarihi) { whereClauses += ` AND AnaVeri.TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
+
+        // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
         const abcQuery = `
-            ${KARLILIK_HESAPLAMA_CTE},
+            WITH ${KARLILIK_HESAPLAMA_CTES_DEF},
             MusteriCiroKar AS (
                 SELECT
                     FIRMAADI,
@@ -923,8 +1026,8 @@ app.get('/musteri-deger-analizi', async (req, res) => {
                     FIRMAADI,
                     ToplamCiro,
                     ToplamKar,
-                    (ToplamCiro * 100.0) / GenelToplamCiro AS CiroPayiYuzdesi,
-                    (SUM(ToplamCiro) OVER (ORDER BY ToplamCiro DESC, FIRMAADI) * 100.0) / GenelToplamCiro AS KumulatifCiroYuzdesi
+                    CASE WHEN GenelToplamCiro = 0 THEN 0 ELSE (ToplamCiro * 100.0) / GenelToplamCiro END AS CiroPayiYuzdesi, /* Bölme sıfır kontrolü */
+                    CASE WHEN GenelToplamCiro = 0 THEN 0 ELSE (SUM(ToplamCiro) OVER (ORDER BY ToplamCiro DESC, FIRMAADI) * 100.0) / GenelToplamCiro END AS KumulatifCiroYuzdesi /* Bölme sıfır kontrolü */
                 FROM MusteriCiroKar, GenelToplam
                 WHERE ToplamCiro > 0
             )
@@ -954,7 +1057,7 @@ app.get('/musteri-deger-analizi', async (req, res) => {
                 else kpis.sayiC++;
             });
         }
-        
+
         res.render('musteri-deger-analizi', {
             sayfaBasligi: 'Müşteri Değer Analizi (ABC)',
             sonuclar,
@@ -981,7 +1084,7 @@ app.get('/kayip-musteri-analizi', async (req, res) => {
         let kpis = { toplamKayipMusteri: 0, toplamKayipCiro: 0 };
 
         const request = pool.request();
-        
+
         let subQueryFilter = 'AND FIS_TURU IN (21, 101)';
         if (temsilci) {
             subQueryFilter += ' AND SATISTEMSILCI = @temsilciParam';
@@ -994,13 +1097,13 @@ app.get('/kayip-musteri-analizi', async (req, res) => {
 
         const churnQuery = `
             WITH Musteriler2024 AS (
-                SELECT DISTINCT FIRMAADI 
-                FROM YC_SATIS_DETAY_TUMU 
+                SELECT DISTINCT FIRMAADI
+                FROM YC_SATIS_DETAY_TUMU
                 WHERE YIL = 2024 ${subQueryFilter}
             ),
             Musteriler2025 AS (
-                SELECT DISTINCT FIRMAADI 
-                FROM YC_SATIS_DETAY_TUMU 
+                SELECT DISTINCT FIRMAADI
+                FROM YC_SATIS_DETAY_TUMU
                 WHERE YIL = 2025 ${subQueryFilter}
             ),
             KayipMusteriler AS (
@@ -1008,7 +1111,7 @@ app.get('/kayip-musteri-analizi', async (req, res) => {
                 EXCEPT
                 SELECT FIRMAADI FROM Musteriler2025
             )
-            SELECT 
+            SELECT
                 km.FIRMAADI,
                 ISNULL(SUM(${NET_TUTAR}), 0) AS KaybedilenCiro2024,
                 MAX(s.TARIH) AS SonSiparisTarihi2024,
@@ -1019,7 +1122,7 @@ app.get('/kayip-musteri-analizi', async (req, res) => {
             GROUP BY km.FIRMAADI
             ORDER BY KaybedilenCiro2024 DESC;
         `;
-        
+
         const result = await request.query(churnQuery);
         sonuclar = result.recordset;
 
@@ -1039,7 +1142,7 @@ app.get('/kayip-musteri-analizi', async (req, res) => {
 
     } catch (err) {
         console.error("Hata - Kayıp Müşteri Analizi: ", err);
-        res.status(500).send('Hata oluştu');
+        res.status(500).send('Hata oluştu: ' + err.message); // Hata mesajını ekrana yazdır
     }
 });
 
@@ -1047,13 +1150,14 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
     try {
         const pool = await poolPromise;
 
+        // DÜZELTİLDİ: WITH ifadesi ve yeni CTE adı kullanıldı
         const scorecardQuery = `
-            ${KARLILIK_HESAPLAMA_CTE},
+            WITH ${KARLILIK_HESAPLAMA_CTES_DEF},
             TemsilciCiroKar2025 AS (
                 SELECT
                     SATISTEMSILCI,
                     SUM(${NET_TUTAR_ANAVERI}) as ToplamCiro,
-                    CASE 
+                    CASE
                         WHEN SUM(${NET_TUTAR_ANAVERI}) = 0 THEN 0
                         ELSE (SUM((${NET_TUTAR_ANAVERI}) - ((${NET_MIKTAR_ANAVERI}) * DogruBirimMaliyet)) * 100.0) / SUM(${NET_TUTAR_ANAVERI})
                     END as KarMarji
@@ -1070,7 +1174,7 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
             MusteriTutma AS (
                 SELECT
                     t24.SATISTEMSILCI,
-                    (COUNT(t25.FIRMAADI) * 100.0) / COUNT(t24.FIRMAADI) as MusteriTutmaOrani
+                    CASE WHEN COUNT(t24.FIRMAADI) = 0 THEN 0 ELSE (COUNT(t25.FIRMAADI) * 100.0) / COUNT(t24.FIRMAADI) END as MusteriTutmaOrani
                 FROM TemsilciMusterileri2024 t24
                 LEFT JOIN TemsilciMusterileri2025 t25 ON t24.SATISTEMSILCI = t25.SATISTEMSILCI AND t24.FIRMAADI = t25.FIRMAADI
                 GROUP BY t24.SATISTEMSILCI
@@ -1093,7 +1197,11 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
             MusteriSiniflari AS (
                 SELECT
                     FIRMAADI,
-                    CASE WHEN (SUM(ToplamCiro) OVER (ORDER BY ToplamCiro DESC, FIRMAADI) * 100.0) / GenelToplamCiro <= 80 THEN 'A' ELSE 'B' END as Sinif
+                    CASE WHEN GenelToplamCiro = 0 THEN 'C'
+                         WHEN (SUM(ToplamCiro) OVER (ORDER BY ToplamCiro DESC, FIRMAADI) * 100.0) / GenelToplamCiro <= 80 THEN 'A'
+                         WHEN (SUM(ToplamCiro) OVER (ORDER BY ToplamCiro DESC, FIRMAADI) * 100.0) / GenelToplamCiro <= 95 THEN 'B'
+                         ELSE 'C'
+                    END as Sinif
                 FROM MusteriCiro2025, GenelToplam2025
                 WHERE ToplamCiro > 0
             ),
@@ -1104,7 +1212,7 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
                 WHERE s.YIL = 2025 AND ms.Sinif = 'A' AND s.SATISTEMSILCI IS NOT NULL
                 GROUP BY s.SATISTEMSILCI
             )
-            SELECT 
+            SELECT
                 t.SATISTEMSILCI,
                 ISNULL(ck.ToplamCiro, 0) as ToplamCiro,
                 ISNULL(ck.KarMarji, 0) as KarMarji,
@@ -1120,15 +1228,15 @@ app.get('/temsilci-etkinlik-karnesi', async (req, res) => {
         `;
 
         const result = await pool.request().query(scorecardQuery);
-        
+
         res.render('temsilci-etkinlik-karnesi', {
             sayfaBasligi: 'Temsilci Etkinlik Karnesi',
             sonuclar: result.recordset
         });
 
     } catch (err) {
-        console.error("Hata - Temsilci Etkinlik Karnesi: ", err);
-        res.status(500).send('Hata oluştu');
+        console.error("Hata - Temsilci Etkinlik Karnesi: ", err); // Hatayı loglayın
+        res.status(500).send('Hata oluştu: ' + err.message); // Hata mesajını gönderin
     }
 });
 
@@ -1143,7 +1251,7 @@ app.get('/musteri-siparis-riski', async (req, res) => {
         let kpis = { toplamMusteri: 0, guvenliSayisi: 0, riskliSayisi: 0, cokRiskliSayisi: 0 };
 
         const request = pool.request();
-        
+
         let whereClauses = 'WHERE YIL IN (2024, 2025) AND FIS_TURU IN (21, 101)';
         if (temsilci) {
             whereClauses += ' AND SATISTEMSILCI = @temsilciParam';
@@ -1187,7 +1295,7 @@ app.get('/musteri-siparis-riski', async (req, res) => {
             WHERE ToplamSiparisGunuSayisi > 1
             ORDER BY RiskDurumu, SonSiparistenGecenSure DESC;
         `;
-        
+
         const result = await request.query(riskQuery);
         sonuclar = result.recordset;
 
@@ -1269,7 +1377,7 @@ app.get('/musteri-bagimliligi', async (req, res) => {
 
         const request = pool.request();
         let whereClauses = `WHERE ${BASE_WHERE_CLAUSE_SIMPLE.replace('s.YIL', 'YIL').replace('s.STOK_ADI', 'STOK_ADI').replace('s.TEDARIKCI', 'TEDARIKCI')}`;
-        
+
         if (baslangicTarihi) { whereClauses += ` AND TARIH >= @baslangicParam`; request.input('baslangicParam', sql.Date, baslangicTarihi); }
         if (bitisTarihi) { whereClauses += ` AND TARIH <= @bitisParam`; request.input('bitisParam', sql.Date, bitisTarihi); }
         if (temsilci) { whereClauses += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
@@ -1284,17 +1392,17 @@ app.get('/musteri-bagimliligi', async (req, res) => {
                 ${whereClauses}
                 GROUP BY FIRMAADI
             )
-            SELECT 
+            SELECT
                 FIRMAADI,
                 ToplamCiro,
                 Sira
-            FROM MusteriCiro 
+            FROM MusteriCiro
             WHERE Sira <= 10 AND ToplamCiro > 0
             ORDER BY Sira;
         `;
         const top10Result = await request.query(query);
         const genelToplamResult = await request.query(`SELECT SUM(CASE WHEN FIS_TURU IN (23, 102) THEN -TUTAR ELSE TUTAR END) as GenelToplamCiro FROM YC_SATIS_DETAY_TUMU ${whereClauses}`);
-        
+
         const sonuclar = top10Result.recordset;
         const toplamCiro = genelToplamResult.recordset[0].GenelToplamCiro || 0;
 
@@ -1339,12 +1447,12 @@ app.get('/urun-kanibalizasyon', async (req, res) => {
 
             const lansmanResult = await pool.request().input('yeniUrun', sql.NVarChar, yeni_urun).query('SELECT MIN(TARIH) as LansmanTarihi FROM YC_SATIS_DETAY_TUMU WHERE STOK_ADI = @yeniUrun AND FIS_TURU IN (21, 101)');
             const lansmanTarihi = lansmanResult.recordset[0].LansmanTarihi;
-            
+
             const salesQuery = `
-                SELECT 
-                    STOK_ADI, 
-                    YIL, 
-                    AY, 
+                SELECT
+                    STOK_ADI,
+                    YIL,
+                    AY,
                     SUM(${NET_MIKTAR.replace('s.','')}) as ToplamMiktar
                 FROM YC_SATIS_DETAY_TUMU s
                 WHERE STOK_ADI IN (@eskiUrun, @yeniUrun)
@@ -1375,7 +1483,7 @@ app.get('/urun-kanibalizasyon', async (req, res) => {
                 chartData = { labels, eskiUrunData, yeniUrunData, lansmanTarihi };
             }
         }
-        
+
         res.render('urun-kanibalizasyon', {
             sayfaBasligi: 'Ürün Kanibalizasyon Analizi',
             urunler,
@@ -1384,116 +1492,6 @@ app.get('/urun-kanibalizasyon', async (req, res) => {
         });
     } catch (err) {
         console.error("Hata - Ürün Kanibalizasyon: ", err);
-        res.status(500).send('Hata oluştu');
-    }
-});
-
-// YENİ EKLENEN RAPOR: TEDARİKCİ KATEGORİ KIYASLAMA
-app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
-    try {
-        const { tedarikci, metrik = 'tutar' } = req.query;
-        const { tedarikciler } = await getFilterData(['tedarikciler']);
-        
-        let sonuclar = [];
-        if (tedarikci) {
-            const pool = await poolPromise;
-            const request = pool.request();
-            request.input('tedarikciParam', sql.NVarChar, tedarikci);
-            
-            let aggregationColumn2024;
-            let aggregationColumn2025;
-            let aggregationColumnName; // EJS'de kullanılacak
-
-            if (metrik === 'adet') {
-                aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_MIKTAR} ELSE 0 END), 0) as Metrik2024`;
-                aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_MIKTAR} ELSE 0 END), 0) as Metrik2025`;
-                aggregationColumnName = 'Miktar';
-            } else if (metrik === 'litre') {
-                aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2024`;
-                aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2025`;
-                aggregationColumnName = 'Litre';
-            } else { // Tutar varsayılan
-                aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2024`;
-                aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2025`;
-                aggregationColumnName = 'Tutar';
-            }
-            
-            const query = `
-                SELECT
-                    s.KATEGORI,
-                    s.URUN_GRUBU,
-                    s.AY,
-                    ${aggregationColumn2024},
-                    ${aggregationColumn2025}
-                FROM YC_SATIS_DETAY_TUMU s
-                WHERE 
-                    s.TEDARIKCI = @tedarikciParam
-                    AND s.YIL IN (2024, 2025)
-                    AND s.FIS_TURU IN (101, 102) -- Sadece Market Satışları
-                    AND s.KATEGORI IS NOT NULL
-                    AND s.URUN_GRUBU IS NOT NULL
-                GROUP BY s.KATEGORI, s.URUN_GRUBU, s.AY
-                ORDER BY s.KATEGORI, s.URUN_GRUBU, s.AY;
-            `;
-            
-            const result = await request.query(query);
-            
-            const ayIsimleri = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-            const kategoriMap = new Map();
-
-            for (const satir of result.recordset) {
-                if (!kategoriMap.has(satir.KATEGORI)) {
-                    kategoriMap.set(satir.KATEGORI, {
-                        KATEGORI: satir.KATEGORI,
-                        Toplam2024: 0,
-                        Toplam2025: 0,
-                        urunGrubuMap: new Map()
-                    });
-                }
-                const kategori = kategoriMap.get(satir.KATEGORI);
-
-                if (!kategori.urunGrubuMap.has(satir.URUN_GRUBU)) {
-                    const aylikData = Array(12).fill(null).map((_, i) => ({
-                        ay: ayIsimleri[i],
-                        Metrik2024: 0,
-                        Metrik2025: 0
-                    }));
-                    
-                    kategori.urunGrubuMap.set(satir.URUN_GRUBU, {
-                        URUN_GRUBU: satir.URUN_GRUBU,
-                        Toplam2024: 0,
-                        Toplam2025: 0,
-                        aylikData: aylikData
-                    });
-                }
-                const grup = kategori.urunGrubuMap.get(satir.URUN_GRUBU);
-
-                const ayIndex = satir.AY - 1;
-                grup.aylikData[ayIndex].Metrik2024 = satir.Metrik2024;
-                grup.aylikData[ayIndex].Metrik2025 = satir.Metrik2025;
-
-                grup.Toplam2024 += satir.Metrik2024;
-                grup.Toplam2025 += satir.Metrik2025;
-                kategori.Toplam2024 += satir.Metrik2024;
-                kategori.Toplam2025 += satir.Metrik2025;
-            }
-
-            sonuclar = Array.from(kategoriMap.values()).map(kategori => {
-                kategori.urunGruplari = Array.from(kategori.urunGrubuMap.values());
-                delete kategori.urunGrubuMap;
-                return kategori;
-            });
-        }
-
-        res.render('tedarikci-kategori-kiyaslama', {
-            sayfaBasligi: 'Tedarikçi Kategori Kıyaslama',
-            tedarikciler,
-            sonuclar,
-            filtreler: { tedarikci, metrik }
-        });
-
-    } catch (err) {
-        console.error("Hata - Tedarikçi Kategori Kıyaslama: ", err);
         res.status(500).send('Hata oluştu');
     }
 });
@@ -1537,7 +1535,7 @@ app.get('/api/kategoriler-by-tedarikci', async (req, res) => {
              request.input('tedarikciParam', sql.NVarChar, tedarikci);
         }
         query += ` ORDER BY KATEGORI`;
-        
+
         const result = (await request.query(query)).recordset;
         res.json(result);
     } catch (err) {
@@ -1563,7 +1561,7 @@ app.get('/api/urun-gruplari-by-tedarikci', async (req, res) => {
             query += ` AND FIS_TURU IN (101, 102)`;
         }
         query += ` ORDER BY URUN_GRUBU`;
-        
+
         const result = (await request.query(query)).recordset;
         res.json(result);
     } catch (err) {
@@ -1577,7 +1575,7 @@ app.get('/api/urunler', async (req, res) => {
         const pool = await poolPromise;
         const { temsilci, tedarikci, urun_grubu } = req.query;
         let query = `
-            SELECT DISTINCT gu.STOK_ADI 
+            SELECT DISTINCT gu.STOK_ADI
             FROM YC_SATIS_DETAY_TUMU s
             JOIN ${GUNCEL_URUNLER_SUBQUERY} gu ON s.STOK_KODU = gu.STOK_KODU
             WHERE ${BASE_WHERE_CLAUSE_PREFIXED}
@@ -1586,7 +1584,7 @@ app.get('/api/urunler', async (req, res) => {
         if (temsilci) { query += ` AND s.SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
         if (tedarikci) { query += ` AND s.TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
         if (urun_grubu) { query += ` AND s.URUN_GRUBU = @urunGrubuParam`; request.input('urunGrubuParam', sql.NVarChar, urun_grubu); }
-        
+
         query += ` ORDER BY gu.STOK_ADI`;
         const result = (await request.query(query)).recordset;
         res.json(result);
@@ -1612,7 +1610,7 @@ app.get('/api/musteriler', async (req, res) => {
             query += ` AND FIS_TURU IN (101, 102)`;
         }
         query += ` ORDER BY FIRMAADI`;
-        
+
         const result = (await request.query(query)).recordset;
         res.json(result);
     } catch (err) {
@@ -1633,7 +1631,7 @@ app.get('/api/musteriler-by-temsilci', async (req, res) => {
              request.input('temsilciParam', sql.NVarChar, temsilci);
         }
         query += ` ORDER BY FIRMAADI`;
-        
+
         const result = (await request.query(query)).recordset;
         res.json(result);
     } catch (err) {
@@ -1651,7 +1649,7 @@ app.get('/api/urun-gruplari', async (req, res) => {
         const request = pool.request();
         if (temsilci) { query += ` AND SATISTEMSILCI = @temsilciParam`; request.input('temsilciParam', sql.NVarChar, temsilci); }
         if (tedarikci) { query += ` AND TEDARIKCI = @tedarikciParam`; request.input('tedarikciParam', sql.NVarChar, tedarikci); }
-        
+
         query += ` ORDER BY URUN_GRUBU`;
         const result = (await request.query(query)).recordset;
         res.json(result);

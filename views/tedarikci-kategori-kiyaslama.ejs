@@ -12,12 +12,21 @@
         font-weight: bold;
     }
     .kategori-row td {
-        padding-top: 15px;
-        padding-bottom: 15px;
+        padding-top: 15px !important;
+        padding-bottom: 15px !important;
         color: var(--secondary-color);
+        font-size: 1.1rem; /* Kategori adını büyüt */
+    }
+    .grup-row {
+        background-color: #fff;
     }
     .grup-row td:first-child {
-        padding-left: 40px; /* Ürün grubu için girinti */
+        padding-left: 40px !important; /* Ürün grubu için girinti */
+        font-weight: bold;
+    }
+    .ay-row td:first-child {
+        padding-left: 80px !important; /* Ay için girinti */
+        font-size: 0.85rem;
     }
     table th {
         white-space: normal !important;
@@ -32,7 +41,7 @@
         </button>
     </h1>
     <p style="margin-top: -1.2rem; margin-bottom: 1.5rem; color: #666;">
-        Seçilen tedarikçinin 2024 ve 2025 yılı Market (Perakende) satışlarını kategori ve ürün grubu bazında karşılaştırır.
+        Seçilen tedarikçinin 2024 ve 2025 yılı Market (Perakende) satışlarını kategori, ürün grubu ve ay bazında karşılaştırır.
     </p>
 
     <div class="print-summary">
@@ -76,6 +85,7 @@
             if (filtreler.metrik === 'adet') birimText = 'Adet';
 
             const formatNumber = (num) => {
+                if (!num) num = 0; // Null veya undefined gelirse 0 yap
                 if (filtreler.metrik === 'tutar') {
                     return num.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
                 }
@@ -86,7 +96,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Kategori / Ürün Grubu</th>
+                    <th>Kategori / Ürün Grubu / Ay</th>
                     <th>2024 Net <%= birimText %></th>
                     <th>2025 Net <%= birimText %></th>
                     <th>Büyüme %</th>
@@ -113,20 +123,37 @@
                     <% kategori.urunGruplari.forEach(grup => { %>
                         <% 
                             let grupDegisim = 0;
-                            if (grup.Metrik2024 > 0) {
-                                grupDegisim = ((grup.Metrik2025 - grup.Metrik2024) / grup.Metrik2024) * 100;
-                            } else if (grup.Metrik2025 > 0) {
+                            if (grup.Toplam2024 > 0) {
+                                grupDegisim = ((grup.Toplam2025 - grup.Toplam2024) / grup.Toplam2024) * 100;
+                            } else if (grup.Toplam2025 > 0) {
                                 grupDegisim = 100;
                             }
                         %>
                         <tr class="grup-row">
-                            <td><%= grup.URUN_GRUBU %></td>
-                            <td class="sayisal"><%= formatNumber(grup.Metrik2024) %></td>
-                            <td class="sayisal"><%= formatNumber(grup.Metrik2025) %></td>
+                            <td><i class="fa-solid fa-folder"></i> <%= grup.URUN_GRUBU %></td>
+                            <td class="sayisal"><%= formatNumber(grup.Toplam2024) %></td>
+                            <td class="sayisal"><%= formatNumber(grup.Toplam2025) %></td>
                             <td class="sayisal <%= grupDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
                                 <%= grupDegisim.toFixed(2) %>%
                             </td>
                         </tr>
+                        <% grup.aylikData.forEach(ay => { %>
+                            <% if(ay.Metrik2024 > 0 || ay.Metrik2025 > 0) { // Sadece veri olan ayları göster %>
+                                <%
+                                    let ayDegisim = 0;
+                                    if (ay.Metrik2024 > 0) ayDegisim = ((ay.Metrik2025 - ay.Metrik2024) / ay.Metrik2024) * 100;
+                                    else if (ay.Metrik2025 > 0) ayDegisim = 100;
+                                %>
+                                <tr class="ay-row">
+                                    <td><%= ay.ay %></td>
+                                    <td class="sayisal"><%= formatNumber(ay.Metrik2024) %></td>
+                                    <td class="sayisal"><%= formatNumber(ay.Metrik2025) %></td>
+                                    <td class="sayisal <%= ayDegisim >= 0 ? 'karlilik-pozitif' : 'karlilik-negatif' %>">
+                                        <%= ayDegisim.toFixed(2) %>%
+                                    </td>
+                                </tr>
+                            <% } %>
+                        <% }) %>
                     <% }) %>
                 <% }) %>
             </tbody>

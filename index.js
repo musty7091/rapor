@@ -595,9 +595,8 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
             const request = pool.request();
             request.input('tedarikciParam', sql.NVarChar, tedarikci);
             
-            // Hangi metrik seçildiyse sorgu ona göre hazırlanıyor
-            let aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2024`;
-            let aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2025`;
+            let aggregationColumn2024;
+            let aggregationColumn2025;
 
             if (metrik === 'adet') {
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_MIKTAR} ELSE 0 END), 0) as Metrik2024`;
@@ -605,12 +604,16 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
             } else if (metrik === 'litre') {
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2024`;
                 aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2025`;
+            } else { // Tutar varsayılan
+                aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2024`;
+                aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2025`;
             }
             
             const query = `
                 SELECT
                     s.KATEGORI,
                     s.URUN_GRUBU,
+                    s.AY,
                     ${aggregationColumn2024},
                     ${aggregationColumn2025}
                 FROM YC_SATIS_DETAY_TUMU s
@@ -620,36 +623,64 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
                     AND s.FIS_TURU IN (101, 102) -- Sadece Market Satışları
                     AND s.KATEGORI IS NOT NULL
                     AND s.URUN_GRUBU IS NOT NULL
-                GROUP BY s.KATEGORI, s.URUN_GRUBU
-                ORDER BY s.KATEGORI, s.URUN_GRUBU;
+                GROUP BY s.KATEGORI, s.URUN_GRUBU, s.AY
+                ORDER BY s.KATEGORI, s.URUN_GRUBU, s.AY;
             `;
             
             const result = await request.query(query);
             
-            // Veriyi EJS'de kolay işlemek için gruplayalım
-            const gruplanmisSonuclar = new Map();
+            const ayIsimleri = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+            const kategoriMap = new Map();
+
             for (const satir of result.recordset) {
-                if (!gruplanmisSonuclar.has(satir.KATEGORI)) {
-                    gruplanmisSonuclar.set(satir.KATEGORI, {
+                if (!kategoriMap.has(satir.KATEGORI)) {
+                    kategoriMap.set(satir.KATEGORI, {
                         KATEGORI: satir.KATEGORI,
                         Toplam2024: 0,
                         Toplam2025: 0,
-                        urunGruplari: []
+                        urunGrubuMap: new Map()
                     });
                 }
-                const kategori = gruplanmisSonuclar.get(satir.KATEGORI);
+                const kategori = kategoriMap.get(satir.KATEGORI);
+
+                if (!kategori.urunGrubuMap.has(satir.URUN_GRUBU)) {
+                    const aylikData = Array(12).fill(null).map((_, i) => ({
+                        ay: ayIsimleri[i],
+                        Metrik2024: 0,
+                        Metrik2025: 0
+                    }));
+                    
+                    kategori.urunGrubuMap.set(satir.URUN_GRUBU, {
+                        URUN_GRUBU: satir.URUN_GRUBU,
+                        Toplam2024: 0,
+                        Toplam2025: 0,
+                        aylikData: aylikData
+                    });
+                }
+                const grup = kategori.urunGrubuMap.get(satir.URUN_GRUBU);
+
+                const ayIndex = satir.AY - 1;
+                grup.aylikData[ayIndex].Metrik2024 = satir.Metrik2024;
+                grup.aylikData[ayIndex].Metrik2025 = satir.Metrik2025;
+
+                grup.Toplam2024 += satir.Metrik2024;
+                grup.Toplam2025 += satir.Metrik2025;
                 kategori.Toplam2024 += satir.Metrik2024;
                 kategori.Toplam2025 += satir.Metrik2025;
-                kategori.urunGruplari.push(satir);
             }
-            sonuclar = Array.from(gruplanmisSonuclar.values());
+
+            sonuclar = Array.from(kategoriMap.values()).map(kategori => {
+                kategori.urunGruplari = Array.from(kategori.urunGrubuMap.values());
+                delete kategori.urunGrubuMap;
+                return kategori;
+            });
         }
 
         res.render('tedarikci-kategori-kiyaslama', {
             sayfaBasligi: 'Tedarikçi Kategori Kıyaslama',
             tedarikciler,
             sonuclar,
-            filtreler: { tedarikci, metrik } // Metrik filtresi EJS'ye gönderildi
+            filtreler: { tedarikci, metrik }
         });
 
     } catch (err) {
@@ -1357,6 +1388,7 @@ app.get('/urun-kanibalizasyon', async (req, res) => {
     }
 });
 
+// YENİ EKLENEN RAPOR: TEDARİKCİ KATEGORİ KIYASLAMA
 app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
     try {
         const { tedarikci, metrik = 'tutar' } = req.query;
@@ -1370,22 +1402,27 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
             
             let aggregationColumn2024;
             let aggregationColumn2025;
+            let aggregationColumnName; // EJS'de kullanılacak
 
             if (metrik === 'adet') {
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_MIKTAR} ELSE 0 END), 0) as Metrik2024`;
                 aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_MIKTAR} ELSE 0 END), 0) as Metrik2025`;
+                aggregationColumnName = 'Miktar';
             } else if (metrik === 'litre') {
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2024`;
                 aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_LITRE} ELSE 0 END), 0) as Metrik2025`;
+                aggregationColumnName = 'Litre';
             } else { // Tutar varsayılan
                 aggregationColumn2024 = `ISNULL(SUM(CASE WHEN s.YIL = 2024 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2024`;
                 aggregationColumn2025 = `ISNULL(SUM(CASE WHEN s.YIL = 2025 THEN ${NET_TUTAR} ELSE 0 END), 0) as Metrik2025`;
+                aggregationColumnName = 'Tutar';
             }
             
             const query = `
                 SELECT
                     s.KATEGORI,
                     s.URUN_GRUBU,
+                    s.AY,
                     ${aggregationColumn2024},
                     ${aggregationColumn2025}
                 FROM YC_SATIS_DETAY_TUMU s
@@ -1395,28 +1432,57 @@ app.get('/tedarikci-kategori-kiyaslama', async (req, res) => {
                     AND s.FIS_TURU IN (101, 102) -- Sadece Market Satışları
                     AND s.KATEGORI IS NOT NULL
                     AND s.URUN_GRUBU IS NOT NULL
-                GROUP BY s.KATEGORI, s.URUN_GRUBU
-                ORDER BY s.KATEGORI, s.URUN_GRUBU;
+                GROUP BY s.KATEGORI, s.URUN_GRUBU, s.AY
+                ORDER BY s.KATEGORI, s.URUN_GRUBU, s.AY;
             `;
             
             const result = await request.query(query);
             
-            const gruplanmisSonuclar = new Map();
+            const ayIsimleri = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+            const kategoriMap = new Map();
+
             for (const satir of result.recordset) {
-                if (!gruplanmisSonuclar.has(satir.KATEGORI)) {
-                    gruplanmisSonuclar.set(satir.KATEGORI, {
+                if (!kategoriMap.has(satir.KATEGORI)) {
+                    kategoriMap.set(satir.KATEGORI, {
                         KATEGORI: satir.KATEGORI,
                         Toplam2024: 0,
                         Toplam2025: 0,
-                        urunGruplari: []
+                        urunGrubuMap: new Map()
                     });
                 }
-                const kategori = gruplanmisSonuclar.get(satir.KATEGORI);
+                const kategori = kategoriMap.get(satir.KATEGORI);
+
+                if (!kategori.urunGrubuMap.has(satir.URUN_GRUBU)) {
+                    const aylikData = Array(12).fill(null).map((_, i) => ({
+                        ay: ayIsimleri[i],
+                        Metrik2024: 0,
+                        Metrik2025: 0
+                    }));
+                    
+                    kategori.urunGrubuMap.set(satir.URUN_GRUBU, {
+                        URUN_GRUBU: satir.URUN_GRUBU,
+                        Toplam2024: 0,
+                        Toplam2025: 0,
+                        aylikData: aylikData
+                    });
+                }
+                const grup = kategori.urunGrubuMap.get(satir.URUN_GRUBU);
+
+                const ayIndex = satir.AY - 1;
+                grup.aylikData[ayIndex].Metrik2024 = satir.Metrik2024;
+                grup.aylikData[ayIndex].Metrik2025 = satir.Metrik2025;
+
+                grup.Toplam2024 += satir.Metrik2024;
+                grup.Toplam2025 += satir.Metrik2025;
                 kategori.Toplam2024 += satir.Metrik2024;
                 kategori.Toplam2025 += satir.Metrik2025;
-                kategori.urunGruplari.push(satir);
             }
-            sonuclar = Array.from(gruplanmisSonuclar.values());
+
+            sonuclar = Array.from(kategoriMap.values()).map(kategori => {
+                kategori.urunGruplari = Array.from(kategori.urunGrubuMap.values());
+                delete kategori.urunGrubuMap;
+                return kategori;
+            });
         }
 
         res.render('tedarikci-kategori-kiyaslama', {
